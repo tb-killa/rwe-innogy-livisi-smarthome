@@ -1,0 +1,208 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+<resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>1.3</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><data name="ProtocolSpecificEntities" xml:space="preserve"><value>CREATE TABLE [ProtocolSpecificEntities] (
+  [ProtocolId] SMALLINT NOT NULL
+, [DataId] nvarchar(64) NOT NULL
+, [SubId] nvarchar(64) NOT NULL
+, [Data] NTEXT NULL
+);
+
+</value></data>
+  <data name="DeleteAllApplicationSettings" xml:space="preserve"><value>DELETE FROM [ApplicationsSettings] 
+WHERE [ApplicationId] = @appId
+
+</value></data>
+  <data name="TrackData_DropIndex" xml:space="preserve"><value>Drop Index [TrackData].[TrackData_Index];</value></data>
+  <data name="MessageParameters_Messages_FKey" xml:space="preserve"><value>ALTER TABLE [MessageParameters]
+	ADD CONSTRAINT [MessageParameters_Messages_FKey] FOREIGN KEY ([MessageId]) REFERENCES [Messages] ([Id]) ON DELETE CASCADE ON UPDATE NO ACTION;
+
+</value></data>
+  <data name="ApplicationsToken" xml:space="preserve"><value>CREATE TABLE [ApplicationsToken] 
+(
+  [Token]         NTEXT         NOT NULL
+);</value></data>
+  <data name="GetSettingsForApplication" xml:space="preserve"><value>SELECT [Name],
+       [Value]
+FROM [ApplicationsSettings] 
+WHERE [ApplicationId] = @appId
+
+</value></data>
+  <data name="BaseDevicesXml_PKey" xml:space="preserve"><value>ALTER TABLE [BaseDevicesXml]
+	ADD CONSTRAINT [PKey] PRIMARY KEY ([Id]);
+</value></data>
+  <data name="GetSettingsNamesForApplication" xml:space="preserve"><value>SELECT [Name]       
+FROM [ApplicationsSettings] 
+WHERE [ApplicationId] = @appId</value></data>
+  <data name="SelectMessages" xml:space="preserve"><value>SELECT [Id],[Class],[Type],[TimeStamp],[State],[AppId],[AddInVersion],[DeviceIds],[CapabilityIds] FROM [Messages]
+</value></data>
+  <data name="ProtocolSpecificEntities_PKey" xml:space="preserve"><value>ALTER TABLE [ProtocolSpecificEntities]
+ADD CONSTRAINT [ProtocolSpecificEntities_PKey] PRIMARY KEY (ProtocolId,DataId, SubId);</value></data>
+  <data name="ConfigurationVariables" xml:space="preserve"><value>CREATE TABLE [ConfigurationVariables]
+(
+	[Name]				NVARCHAR(255)	NOT NULL,
+	[Value]				NTEXT		 	NOT NULL	
+);</value></data>
+  <data name="LocationsXml_PKey" xml:space="preserve"><value>ALTER TABLE [LocationsXml]
+	ADD CONSTRAINT [PKey] PRIMARY KEY ([Id]);
+</value></data>
+  <data name="ApplicationsSettings" xml:space="preserve"><value>CREATE TABLE [ApplicationsSettings] 
+(
+  [ApplicationId] NVARCHAR(100) NOT NULL,
+  [Name]          NVARCHAR(255) NOT NULL,
+  [Value]         NTEXT         NULL
+);</value></data>
+  <data name="TechnicalConfigurations_PKey" xml:space="preserve"><value>ALTER TABLE [TechnicalConfigurations]
+	ADD CONSTRAINT [TechnicalConfigurations_PKey] PRIMARY KEY ([Id]);
+</value></data>
+  <data name="UtilityData_PKey" xml:space="preserve"><value>ALTER TABLE [UtilityData] 
+	ADD CONSTRAINT [PKey] PRIMARY KEY ([Id]);</value></data>
+  <data name="UtilityData" xml:space="preserve"><value>CREATE TABLE [UtilityData]
+(
+	[Id]			INT	IDENTITY	NOT NULL,
+	[EntityId]		NVARCHAR(50)	NOT NULL,
+	[MeterId]		NVARCHAR(50)	NOT NULL,
+	[Timestamp]		DATETIME		NOT NULL,
+	[UtilityType]	TINYINT			NOT NULL,
+	[Value]			INT				NOT NULL,
+	[Data]			NVARCHAR(50)
+);</value></data>
+  <data name="LogicalDevicesXml_PKey" xml:space="preserve"><value>ALTER TABLE [LogicalDevicesXml]
+	ADD CONSTRAINT [PKey] PRIMARY KEY ([Id]);
+</value></data>
+  <data name="LocationsXml" xml:space="preserve"><value>CREATE TABLE [LocationsXml]
+(
+	[Id]				UNIQUEIDENTIFIER	NOT NULL	ROWGUIDCOL,
+	[Data]				NTEXT 	NOT NULL
+	
+);</value></data>
+  <data name="TrackData_AlterEntityId" xml:space="preserve"><value>Alter Table [TrackData] Alter Column [EntityId] nvarchar(100);</value></data>
+  <data name="UtilityData_Index" xml:space="preserve"><value>CREATE INDEX [UtilityData_Index]
+ON [UtilityData] ([MeterId], [UtilityType]);</value></data>
+  <data name="BaseDevicesXml" xml:space="preserve"><value>CREATE TABLE [BaseDevicesXml]
+(
+	[Id]				UNIQUEIDENTIFIER	NOT NULL	ROWGUIDCOL,
+	[Data]				NTEXT 	NOT NULL	
+);</value></data>
+  <data name="MessageParameters_PKey" xml:space="preserve"><value>ALTER TABLE [MessageParameters]
+    ADD CONSTRAINT [MessagesParameters_PKey] PRIMARY KEY ([Id]);
+
+</value></data>
+  <data name="DeviceActivityLogs" xml:space="preserve"><value>CREATE TABLE [DeviceActivityLogs]
+(
+	[Id]					                                INT	IDENTITY		NOT NULL,	
+	[ActivityType]			                                INT					NOT NULL,	
+	[DeviceId]					                            NVARCHAR(80),	
+	[NewState]										        NTEXT				NOT NULL,
+	[Timestamp]												DATETIME			NOT NULL,
+	[EventType]										        INT					NOT NULL
+);
+</value></data>
+  <data name="ConfigurationVariables_PKey" xml:space="preserve"><value>ALTER TABLE [ConfigurationVariables]
+	ADD CONSTRAINT [PKey] PRIMARY KEY ([Name]);
+</value></data>
+  <data name="SelectMessagesByClassAndType" xml:space="preserve"><value>SELECT [Id],[Class],[Type],[TimeStamp],[State],[AppId],[AddInVersion],[DeviceIds],[CapabilityIds] FROM [Messages] WHERE [Class]=@MessageClass AND [Type] LIKE @MessageType</value></data>
+  <data name="Messages_PKey" xml:space="preserve"><value>ALTER TABLE [Messages]
+    ADD CONSTRAINT [Messages_PKey] PRIMARY KEY ([Id]);
+
+</value></data>
+  <data name="InteractionsXml" xml:space="preserve"><value>CREATE TABLE [InteractionsXml]
+(
+	[Id]				UNIQUEIDENTIFIER	NOT NULL	ROWGUIDCOL,
+	[Data]				NTEXT 	NOT NULL
+	
+);</value></data>
+  <data name="HomeSetupsXml" xml:space="preserve"><value>CREATE TABLE [HomeSetupsXml]
+(
+	[Id]				UNIQUEIDENTIFIER	NOT NULL	ROWGUIDCOL,
+	[Data]				NTEXT 	NOT NULL
+	
+);</value></data>
+  <data name="GetMessagesByParamValue" xml:space="preserve"><value>SELECT m.[Id], m.[Class], m.[Type], m.[TimeStamp], m.[State]
+FROM [Messages] AS m INNER JOIN [MessageParameters] AS mp ON mp.[MessageId] = m.[Id] 
+WHERE mp.[Key] LIKE @ParameterKey AND mp.[Value] LIKE @Value
+</value></data>
+  <data name="HomeSetupsXml_PKey" xml:space="preserve"><value>ALTER TABLE [HomeSetupsXml]
+	ADD CONSTRAINT [PKey] PRIMARY KEY ([Id]);</value></data>
+  <data name="TrackData_PKey" xml:space="preserve"><value>ALTER TABLE [TrackData] 
+	ADD CONSTRAINT [PKey] PRIMARY KEY ([Id]);</value></data>
+  <data name="MessageParameters" xml:space="preserve"><value>CREATE TABLE [MessageParameters]
+(
+	[Id]				UNIQUEIDENTIFIER	NOT NULL ROWGUIDCOL,
+	[MessageId]			UNIQUEIDENTIFIER    NOT NULL,
+	[Key]				NTEXT			    NOT NULL,
+	[Value]				NTEXT       		NOT NULL
+);</value></data>
+  <data name="InteractionsXml_PKey" xml:space="preserve"><value>ALTER TABLE [InteractionsXml]
+	ADD CONSTRAINT [PKey] PRIMARY KEY ([Id]);</value></data>
+  <data name="TechnicalConfigurations" xml:space="preserve"><value>CREATE TABLE [TechnicalConfigurations]
+(
+	[Id]				UNIQUEIDENTIFIER	NOT NULL	ROWGUIDCOL,
+	[Size]				INT					NOT NULL,
+	[Data]				IMAGE				NOT NULL
+);
+</value></data>
+  <data name="TrackData_Index" xml:space="preserve"><value>CREATE INDEX [TrackData_Index]
+ON [TrackData] ([EntityType], [EntityId]);</value></data>
+  <data name="SelectMessageParametersByMessage" xml:space="preserve"><value>SELECT [Id],[Key],[Value] FROM [MessageParameters] WHERE [MessageId] = @MessageId</value></data>
+  <data name="DeviceActivityLogs_PKey" xml:space="preserve"><value>ALTER TABLE [DeviceActivityLogs] 
+	ADD CONSTRAINT [PKey] PRIMARY KEY ([Id]);
+</value></data>
+  <data name="LogicalDevicesXml" xml:space="preserve"><value>CREATE TABLE [LogicalDevicesXml]
+(
+	[Id]				UNIQUEIDENTIFIER	NOT NULL	ROWGUIDCOL,
+	[Data]				NTEXT            	NOT NULL
+	
+);</value></data>
+  <data name="TrackData" xml:space="preserve"><value>CREATE TABLE [TrackData]
+(
+	[Id]					                                INT	IDENTITY		NOT NULL,	
+	[DeviceId]					                            NVARCHAR(50),	
+	[Properties]										    NVARCHAR(50)		NOT NULL,
+	[Timestamp]												DATETIME			NOT NULL,
+	[EventType]										        NVARCHAR(50)		NOT NULL,
+	[EntityId]										        NVARCHAR(75)		NOT NULL,
+	[EntityType]										    NVARCHAR(50)		NOT NULL
+);
+</value></data>
+  <data name="Messages" xml:space="preserve"><value>CREATE TABLE [Messages]
+(
+	[Id]				UNIQUEIDENTIFIER	NOT NULL ROWGUIDCOL,
+	[Class]				TINYINT				NOT NULL,
+	[Type]				NTEXT				NOT NULL,
+	[TimeStamp]			DATETIME			NOT NULL,
+	[State]				TINYINT				NOT NULL,
+	[AppId]				NTEXT			    NOT NULL, 
+	[AddInVersion]		NTEXT			    NOT NULL,
+	[DeviceIds]			NTEXT				NULL,
+	[CapabilityIds]		NTEXT			    NULL
+);</value></data>
+  <data name="ApplicationsSettings_PKey" xml:space="preserve"><value>ALTER TABLE [ApplicationsSettings] 
+    ADD CONSTRAINT [PK_ApplicationsSettings] PRIMARY KEY ([ApplicationId], [Name]);</value></data>
+  </root>

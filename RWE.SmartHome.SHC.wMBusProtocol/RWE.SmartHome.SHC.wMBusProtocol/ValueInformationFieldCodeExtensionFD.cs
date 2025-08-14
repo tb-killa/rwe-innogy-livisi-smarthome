@@ -1,0 +1,35 @@
+namespace RWE.SmartHome.SHC.wMBusProtocol;
+
+public enum ValueInformationFieldCodeExtensionFD
+{
+	CreditN0 = 0,
+	CreditN1 = 1,
+	CreditN2 = 2,
+	CreditN3 = 3,
+	DebitN0 = 4,
+	DebitN1 = 5,
+	DebitN2 = 6,
+	DebitN3 = 7,
+	AccessNumber = 8,
+	Medium = 9,
+	Manufacturer = 10,
+	ParameterSetIdentification = 11,
+	ModelVersion = 12,
+	HardwareVersion = 13,
+	FirmwareVersion = 14,
+	SoftwareVersion = 15,
+	CustomerLocation = 16,
+	Customer = 17,
+	AccessCodeUser = 18,
+	AccessCodeOperator = 19,
+	AceessCodeSystemOperator = 20,
+	AccessCodeDeveloper = 21,
+	Password = 22,
+	ErrorFlags = 23,
+	ErrorMask = 24,
+	DigitalOutput = 26,
+	DigitalInput = 27,
+	Baudrate = 28,
+	ResponseDelayTime = 29,
+	Retry = 30
+}

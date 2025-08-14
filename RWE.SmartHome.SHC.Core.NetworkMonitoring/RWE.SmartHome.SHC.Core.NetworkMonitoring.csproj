@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>RWE.SmartHome.SHC.Core.NetworkMonitoring</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net35</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>12.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup />
+  <ItemGroup>
+    <Reference Include="RWE.SmartHome.SHC.Core">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.Core.NetworkMonitoringInterfaces">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.NetworkMonitoringInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Practices.Mobile.ContainerModel">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Microsoft.Practices.Mobile.ContainerModel.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.StartupLogicInterfaces">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.StartupLogicInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Core">
+      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Core.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,3 @@
+namespace RWE.SmartHome.SHC.BusinessLogicInterfaces.RepositoryOperations;
+
+public delegate void ConfigurationProcessingStatusUpdateEvent(ConfigurationProcessingStatusEventArgs args);

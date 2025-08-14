@@ -1,0 +1,10 @@
+namespace RWE.SmartHome.SHC.HCI.MessageIdentifier;
+
+public enum RadioLinkMessageIdentifier
+{
+	RADIOLINK_MSG_WMBUSMSG_REQ = 1,
+	RADIOLINK_MSG_WMBUSMSG_RSP,
+	RADIOLINK_MSG_WMBUSMSG_IND,
+	RADIOLINK_MSG_DATA_REQ,
+	RADIOLINK_MSG_DATA_RSP
+}

@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>RWE.SmartHome.SHC.SHCRelayDriver</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net35</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>12.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup />
+  <ItemGroup>
+    <Reference Include="RWE.SmartHome.SHC.Core">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.ChannelInterfaces">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.ChannelInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="Rebex.Networking">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Rebex.Networking.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml">
+      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xml.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Core">
+      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="WebSocketLibrary">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\WebSocketLibrary.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.Core.NetworkMonitoringInterfaces">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.NetworkMonitoringInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.DisplayManagerInterfaces">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.DisplayManagerInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Practices.Mobile.ContainerModel">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Microsoft.Practices.Mobile.ContainerModel.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.StartupLogicInterfaces">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.StartupLogicInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.Core.Authentication">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.Authentication.dll</HintPath>
+    </Reference>
+    <Reference Include="Rebex.Common">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Rebex.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.CommonFunctionality">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.CommonFunctionality.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.ChannelMultiplexerInterfaces">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.ChannelMultiplexerInterfaces.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>RWE.SmartHome.SHC.SipCosProtocolAdapterInterfaces</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net35</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>12.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup />
+  <ItemGroup>
+    <Reference Include="RWE.SmartHome.SHC.Core">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.BusinessLogicInterfaces">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.BusinessLogicInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
+    </Reference>
+    <Reference Include="RWE.SmartHome.SHC.DeviceManagerInterfaces">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.DeviceManagerInterfaces.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

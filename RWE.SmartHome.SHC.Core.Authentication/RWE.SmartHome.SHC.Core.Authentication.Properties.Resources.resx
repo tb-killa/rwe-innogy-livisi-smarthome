@@ -1,0 +1,78 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+<resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>1.3</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><data name="AddUserToRole" xml:space="preserve"><value>INSERT INTO [UsersRoles]([UserId],[RoleId]) VALUES (@UserId,@RoleId)
+</value></data>
+  <data name="SelectUserById" xml:space="preserve"><value>SELECT [Id],[Name],[Password],[CreateDate],[LastLoginDate] FROM [Users] WHERE [Id] = @UserId</value></data>
+  <data name="SelectRoleById" xml:space="preserve"><value>SELECT [Id],[Name] FROM [Roles] WHERE [Id] = @RoleId</value></data>
+  <data name="Users_PKey" xml:space="preserve"><value>ALTER TABLE [Users]
+    ADD CONSTRAINT [Users_PKey] PRIMARY KEY ([Id]);
+
+</value></data>
+  <data name="UsersRoles" xml:space="preserve"><value>CREATE TABLE [UsersRoles](
+	[UserId]	UNIQUEIDENTIFIER	NOT NULL,
+	[RoleId]	UNIQUEIDENTIFIER	NOT NULL
+);
+
+</value></data>
+  <data name="SelectRolesByUser" xml:space="preserve"><value>SELECT [Roles].[Id], [Roles].[Name] FROM [UsersRoles] INNER JOIN [Roles] ON [UsersRoles].[RoleId] = [Roles].[Id] WHERE [UsersRoles].[UserId] = @UserId</value></data>
+  <data name="UsersRoles_Users_FKey" xml:space="preserve"><value>ALTER TABLE [UsersRoles]
+	ADD CONSTRAINT [UsersRoles_Users_FKey] FOREIGN KEY ([UserId]) REFERENCES [Users] ([Id]) ON DELETE CASCADE ON UPDATE NO ACTION;
+
+</value></data>
+  <data name="SelectUserByName" xml:space="preserve"><value>SELECT [Id],[Name],[Password],[CreateDate],[LastLoginDate] FROM [Users] WHERE [Name] = @UserName</value></data>
+  <data name="SelectUsersByRole" xml:space="preserve"><value>SELECT u.[Id],u.[Name],u.[Password],u.[CreateDate],u.[LastLoginDate] FROM [UsersRoles] AS ur INNER JOIN [Users] AS u ON ur.[UserId] = u.[Id] WHERE ur.[RoleId] = @RoleId</value></data>
+  <data name="Users" xml:space="preserve"><value>CREATE TABLE [Users]
+(
+	[Id]				UNIQUEIDENTIFIER	NOT NULL ROWGUIDCOL,
+	[Name]				NVARCHAR (64)		NOT NULL UNIQUE,
+	[Password]			NVARCHAR (64)		NOT NULL,
+	[CreateDate]		DATETIME			NOT NULL,
+	[LastLoginDate]		DATETIME			NOT NULL
+);</value></data>
+  <data name="Roles" xml:space="preserve"><value>CREATE TABLE [Roles](
+	[Id]	UNIQUEIDENTIFIER	NOT NULL ROWGUIDCOL,
+	[Name]	NVARCHAR (64)		NOT NULL UNIQUE
+);
+</value></data>
+  <data name="RemoveUserFromRole" xml:space="preserve"><value>DELETE FROM [UsersRoles] WHERE [UserId]=@UserId AND [RoleId]=@RoleId
+</value></data>
+  <data name="Roles_PKey" xml:space="preserve"><value>ALTER TABLE [Roles]
+    ADD CONSTRAINT [Roles_PKey] PRIMARY KEY ([Id]);
+
+</value></data>
+  <data name="UsersRoles_Roles_FKey" xml:space="preserve"><value>ALTER TABLE [UsersRoles]
+	ADD CONSTRAINT [UsersRoles_Roles_FKey] FOREIGN KEY ([RoleId]) REFERENCES [Roles] ([Id]) ON DELETE CASCADE ON UPDATE NO ACTION;
+
+</value></data>
+  <data name="UsersRoles_PKey" xml:space="preserve"><value>ALTER TABLE [UsersRoles]
+    ADD CONSTRAINT [UsersRoles_PKey] PRIMARY KEY ([UserId],[RoleId]);
+
+</value></data>
+  </root>

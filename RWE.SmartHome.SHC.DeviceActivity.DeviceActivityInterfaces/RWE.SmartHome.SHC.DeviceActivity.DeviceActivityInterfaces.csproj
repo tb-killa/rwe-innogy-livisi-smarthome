@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>RWE.SmartHome.SHC.DeviceActivity.DeviceActivityInterfaces</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net35</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>12.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup />
+  <ItemGroup>
+    <Reference Include="RWE.SmartHome.SHC.Core">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

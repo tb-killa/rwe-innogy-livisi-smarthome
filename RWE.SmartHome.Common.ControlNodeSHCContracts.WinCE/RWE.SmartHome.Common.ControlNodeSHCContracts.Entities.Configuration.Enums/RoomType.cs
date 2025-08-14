@@ -1,0 +1,38 @@
+namespace RWE.SmartHome.Common.ControlNodeSHCContracts.Entities.Configuration.Enums;
+
+public enum RoomType : long
+{
+	Other = 1L,
+	Bath = 2L,
+	Balcony = 4L,
+	Library = 8L,
+	Office = 0x10L,
+	Attic = 0x20L,
+	Entrance = 0x40L,
+	Gallery = 0x80L,
+	Diningroom = 0x100L,
+	TvRoom = 0x200L,
+	Hall = 0x400L,
+	Garage = 0x800L,
+	Garden = 0x1000L,
+	SummerHouse = 0x2000L,
+	GuestRoom = 0x4000L,
+	Greenhouse = 0x8000L,
+	UtilityRoom = 0x10000L,
+	Hobby = 0x20000L,
+	Cellar = 0x40000L,
+	Nursery = 0x80000L,
+	Kitchen = 0x100000L,
+	Mobile = 0x200000L,
+	MusicRoom = 0x400000L,
+	PartyRoom = 0x800000L,
+	Pool = 0x1000000L,
+	Bedroom = 0x2000000L,
+	FamilyRoom = 0x4000000L,
+	Terrace = 0x8000000L,
+	Staircase = 0x10000000L,
+	StorageRoom = 0x20000000L,
+	Laundry = 0x40000000L,
+	WinterGarden = 0x80000000L,
+	Livingroom = 0x100000000L
+}

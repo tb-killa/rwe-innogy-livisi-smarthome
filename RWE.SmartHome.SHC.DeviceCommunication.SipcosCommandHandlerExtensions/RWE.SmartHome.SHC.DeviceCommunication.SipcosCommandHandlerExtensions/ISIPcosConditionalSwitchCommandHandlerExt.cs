@@ -1,0 +1,6 @@
+namespace RWE.SmartHome.SHC.DeviceCommunication.SipcosCommandHandlerExtensions;
+
+public interface ISIPcosConditionalSwitchCommandHandlerExt
+{
+	event SIPcosConditionalSwitchCommandHandlerExt.ReceivedConditionalSwitchCommandHandler ReceivedConditionalSwitchCommand;
+}

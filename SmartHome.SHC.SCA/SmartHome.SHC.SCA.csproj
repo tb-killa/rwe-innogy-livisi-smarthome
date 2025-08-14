@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>SmartHome.SHC.SCA</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <TargetFramework>net35</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>12.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemGroup />
+  <ItemGroup>
+    <Reference Include="Rebex.Common">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Rebex.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ServiceModel">
+      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.ServiceModel.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Core">
+      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.Serialization">
+      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Runtime.Serialization.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml">
+      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xml.dll</HintPath>
+    </Reference>
+    <Reference Include="Rebex.Http">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Rebex.Http.dll</HintPath>
+    </Reference>
+    <Reference Include="Rebex.Castle">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Rebex.Castle.dll</HintPath>
+    </Reference>
+    <Reference Include="Rebex.Curve25519">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Rebex.Curve25519.dll</HintPath>
+    </Reference>
+    <Reference Include="Rebex.Networking">
+      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Rebex.Networking.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

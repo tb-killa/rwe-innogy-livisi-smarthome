@@ -1,0 +1,10 @@
+namespace SerialAPI;
+
+internal enum MessageMode : byte
+{
+	SERIAL_MODE_WRITE = 0,
+	SERIAL_MODE_REGISTER_READ = 16,
+	SERIAL_MODE_UNREGISTER_READ = 32,
+	SERIAL_MODE_RECEIVED = 48,
+	SERIAL_MODE_STATUS = 64
+}

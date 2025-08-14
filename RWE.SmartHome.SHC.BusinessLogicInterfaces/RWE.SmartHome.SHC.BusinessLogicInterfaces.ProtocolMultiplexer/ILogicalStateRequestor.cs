@@ -1,0 +1,8 @@
+using RWE.SmartHome.SHC.BusinessLogicInterfaces.ProtocolSpecific;
+
+namespace RWE.SmartHome.SHC.BusinessLogicInterfaces.ProtocolMultiplexer;
+
+public interface ILogicalStateRequestor
+{
+	void RegisterProtocolSpecificStateRequestor(IProtocolSpecificLogicalStateRequestor protocolSpecificLogicalStateRequestor);
+}

@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+<resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>1.3</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><data name="Err1001" xml:space="preserve"><value>Service unavailable</value></data>
+  <data name="Err1000" xml:space="preserve"><value>An unknown error has occurred</value></data>
+  <data name="Err1003" xml:space="preserve"><value>Internal API error</value></data>
+  <data name="Err1002" xml:space="preserve"><value>Service timeout</value></data>
+  <data name="Err1005" xml:space="preserve"><value>Missing argument or wrong value</value></data>
+  <data name="Err1004" xml:space="preserve"><value>SHC invalid operation</value></data>
+  <data name="Err1007" xml:space="preserve"><value>Unsupported request</value></data>
+  <data name="Err1006" xml:space="preserve"><value>Service too busy</value></data>
+  <data name="Err3003" xml:space="preserve"><value>The provided entity already exists</value></data>
+  <data name="Err3002" xml:space="preserve"><value>No change performed</value></data>
+  <data name="Err3001" xml:space="preserve"><value>The provided request content is invalid and can't be parsed</value></data>
+  <data name="Err3000" xml:space="preserve"><value>The requested entity does not exist</value></data>
+  <data name="Err3004" xml:space="preserve"><value>The provided interaction is not valid</value></data>
+  <data name="Err3500" xml:space="preserve"><value>Premium Services can't be directly enabled</value></data>
+  <data name="Err3501" xml:space="preserve"><value>Cannot remove a product that was paid</value></data>
+  <data name="Err2013" xml:space="preserve"><value>Account temporary locked</value></data>
+  <data name="Err2012" xml:space="preserve"><value>Session not found</value></data>
+  <data name="Err2011" xml:space="preserve"><value>Insufficient permissions</value></data>
+  <data name="Err2010" xml:space="preserve"><value>Controller access not allowed</value></data>
+  <data name="Err2002" xml:space="preserve"><value>Invalid token request</value></data>
+  <data name="Err2003" xml:space="preserve"><value>Invalid client credentials</value></data>
+  <data name="Err2000" xml:space="preserve"><value>An unknown error has occured during Authentication or Authorization process</value></data>
+  <data name="Err2001" xml:space="preserve"><value>Access not allowed</value></data>
+  <data name="Err2006" xml:space="preserve"><value>A connection already exists for the current session</value></data>
+  <data name="Err2007" xml:space="preserve"><value>The lifetime of the token has expired</value></data>
+  <data name="Err2004" xml:space="preserve"><value>The token signature is invalid</value></data>
+  <data name="Err2005" xml:space="preserve"><value>Failed to initialize user session</value></data>
+  <data name="Err2008" xml:space="preserve"><value>Login attempted from a different client provider</value></data>
+  <data name="Err2009" xml:space="preserve"><value>Invalid user credentials</value></data>
+  <data name="Err5005" xml:space="preserve"><value>The user has no SHC</value></data>
+  <data name="Err5004" xml:space="preserve"><value>One SHC already registered</value></data>
+  <data name="Err5006" xml:space="preserve"><value>Controller offline</value></data>
+  <data name="Err5001" xml:space="preserve"><value>Could not obtain exclusive access on the configuration</value></data>
+  <data name="Err5000" xml:space="preserve"><value>The configuration could not be updated</value></data>
+  <data name="Err5003" xml:space="preserve"><value>The owner did not accepted the TaC latest version</value></data>
+  <data name="Err5002" xml:space="preserve"><value>Communication with the SHC failed</value></data>
+  <data name="Err5009" xml:space="preserve"><value>Registration failure.</value></data>
+  <data name="Err4000" xml:space="preserve"><value>The triggered action is invalid</value></data>
+  <data name="Err4001" xml:space="preserve"><value>Invalid parameter</value></data>
+  <data name="Err4002" xml:space="preserve"><value>Permission to trigger action not allowed</value></data>
+  <data name="Err4003" xml:space="preserve"><value>Unsupported action type</value></data>
+  <data name="Err6002" xml:space="preserve"><value>Restricted access.</value></data>
+  <data name="Err6000" xml:space="preserve"><value>Request not allowed or too many tries. Try again in 60 minutes.</value></data>
+  <data name="Err6001" xml:space="preserve"><value>The requested code cannot be redeemed.</value></data>
+  </root>

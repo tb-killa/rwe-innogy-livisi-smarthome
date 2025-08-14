@@ -1,0 +1,36 @@
+namespace RWE.SmartHome.SHC.wMBusProtocol;
+
+public enum ControlInformationCode
+{
+	DataSend = 81,
+	SelectionOfSlaves = 82,
+	ApplicationReset = 80,
+	SynchronizeAction = 84,
+	SetBaudrate300 = 184,
+	SetBaudrate600 = 185,
+	SetBaudrate1200 = 186,
+	SetBaudrate2400 = 187,
+	SetBaudrate4800 = 188,
+	SetBaudrate9600 = 189,
+	SetBaudrate19200 = 190,
+	SetBaudrate38400 = 191,
+	ReadoutCompleteRamContent = 177,
+	SendUserData = 178,
+	InitializeTestCalibrationMode = 179,
+	EepromRead = 180,
+	StartSoftwareTest = 182,
+	ReportOfGeneralApplicationErrors = 112,
+	ReportOfAlarmStatus = 113,
+	VariableDataResponseBigHeader = 114,
+	VariableDataResponseShortHeader = 122,
+	VariableDataResponseNoHeader = 120,
+	FixedDataResponse = 115,
+	Hash1 = 144,
+	Hash2 = 145,
+	Hash3 = 146,
+	Hash4 = 147,
+	Hash5 = 148,
+	Hash6 = 149,
+	Hash7 = 150,
+	Hash8 = 151
+}

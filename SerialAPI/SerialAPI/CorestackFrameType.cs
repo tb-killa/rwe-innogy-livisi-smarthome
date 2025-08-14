@@ -1,0 +1,11 @@
+namespace SerialAPI;
+
+public enum CorestackFrameType : byte
+{
+	SIPCOS_APPLICATION,
+	SIPCOS_APPLICATION_FULL,
+	COMPRESSED_ICMP,
+	GENERAL_UDP,
+	COMPRESSED_TCP,
+	GENERAL_IP
+}

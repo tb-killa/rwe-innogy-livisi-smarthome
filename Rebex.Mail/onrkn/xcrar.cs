@@ -1,0 +1,37 @@
+namespace onrkn;
+
+internal enum xcrar
+{
+	xomkp = 0,
+	crqsh = 1,
+	plwre = 2,
+	rjogj = 3,
+	xrlus = 4,
+	ysatw = 5,
+	uvojk = 6,
+	dddyf = 7,
+	devcm = 10,
+	xnjos = 11,
+	xkvvt = 13,
+	yzzqc = 20,
+	bkapb = 30,
+	xmyux = 31,
+	cjxwq = 64,
+	qfwqv = 72,
+	nvjck = 251,
+	lzzsa = 253,
+	oihjp = 254,
+	yesjh = 258,
+	dazgb = 4098,
+	qkgmc = 4099,
+	zfjkc = 4100,
+	gibpf = 4101,
+	yiqqk = 4102,
+	rkomo = 4103,
+	kxwum = 4116,
+	kkdjd = 4126,
+	wymks = 4127,
+	mctvt = 4160,
+	fawvf = 4168,
+	vbevq = 4354
+}
