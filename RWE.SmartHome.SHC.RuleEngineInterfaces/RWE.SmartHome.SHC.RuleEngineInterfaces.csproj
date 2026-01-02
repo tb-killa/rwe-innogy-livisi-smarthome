@@ -12,10 +12,10 @@
   <ItemGroup />
   <ItemGroup>
     <Reference Include="RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.DomainModel">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.DomainModel.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.DomainModel.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

@@ -12,7 +12,7 @@
   <ItemGroup />
   <ItemGroup>
     <Reference Include="SmartHome.SHC.API">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\SmartHome.SHC.API.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\SmartHome.SHC.API.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

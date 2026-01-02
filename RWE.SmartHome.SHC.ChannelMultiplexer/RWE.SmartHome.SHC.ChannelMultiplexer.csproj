@@ -12,22 +12,22 @@
   <ItemGroup />
   <ItemGroup>
     <Reference Include="RWE.SmartHome.SHC.Core">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.Core.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.ChannelMultiplexerInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.ChannelMultiplexerInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.ChannelMultiplexerInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.ChannelInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.ChannelInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.ChannelInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Practices.Mobile.ContainerModel">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Microsoft.Practices.Mobile.ContainerModel.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\Microsoft.Practices.Mobile.ContainerModel.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
     </Reference>
     <Reference Include="System.Core">
-      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Core.dll</HintPath>
+      
     </Reference>
   </ItemGroup>
 </Project>

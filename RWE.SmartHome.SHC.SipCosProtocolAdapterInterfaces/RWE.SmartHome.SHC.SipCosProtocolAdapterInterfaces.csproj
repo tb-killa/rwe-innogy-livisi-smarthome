@@ -12,16 +12,16 @@
   <ItemGroup />
   <ItemGroup>
     <Reference Include="RWE.SmartHome.SHC.Core">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.Core.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.BusinessLogicInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.BusinessLogicInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.BusinessLogicInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.DeviceManagerInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.DeviceManagerInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.DeviceManagerInterfaces.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

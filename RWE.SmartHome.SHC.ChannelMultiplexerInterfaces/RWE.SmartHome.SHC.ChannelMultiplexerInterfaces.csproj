@@ -12,10 +12,10 @@
   <ItemGroup />
   <ItemGroup>
     <Reference Include="RWE.SmartHome.SHC.Core">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.Core.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.ChannelInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.ChannelInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.ChannelInterfaces.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

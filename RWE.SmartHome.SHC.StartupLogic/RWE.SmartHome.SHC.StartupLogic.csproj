@@ -14,43 +14,43 @@
   <ItemGroup />
   <ItemGroup>
     <Reference Include="RWE.SmartHome.SHC.Core">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.Core.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.StartupLogicInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.StartupLogicInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.StartupLogicInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.BackendCommunicationInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.BackendCommunicationInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.BackendCommunicationInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.Core.Authentication">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.Authentication.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.Core.Authentication.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.DisplayManagerInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.DisplayManagerInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.DisplayManagerInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.CommonFunctionality">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.CommonFunctionality.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.CommonFunctionality.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.DeviceManagerInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.DeviceManagerInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.DeviceManagerInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.BusinessLogicInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.BusinessLogicInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.BusinessLogicInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.Core.NetworkMonitoringInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.NetworkMonitoringInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.Core.NetworkMonitoringInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Practices.Mobile.ContainerModel">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Microsoft.Practices.Mobile.ContainerModel.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\Microsoft.Practices.Mobile.ContainerModel.dll</HintPath>
     </Reference>
     <Reference Include="System.Core">
-      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Core.dll</HintPath>
+      
     </Reference>
     <Reference Include="RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.ErrorHandling">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.ErrorHandling.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.ErrorHandling.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

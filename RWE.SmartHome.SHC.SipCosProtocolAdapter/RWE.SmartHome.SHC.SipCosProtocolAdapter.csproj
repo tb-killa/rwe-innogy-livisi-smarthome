@@ -12,49 +12,49 @@
   <ItemGroup />
   <ItemGroup>
     <Reference Include="RWE.SmartHome.SHC.SipCosProtocolAdapterInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.SipCosProtocolAdapterInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.SipCosProtocolAdapterInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.BusinessLogicInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.BusinessLogicInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.BusinessLogicInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.Core">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.Core.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.DeviceManagerInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.DeviceManagerInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.DeviceManagerInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.DomainModel">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.DomainModel.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.DomainModel.dll</HintPath>
     </Reference>
     <Reference Include="System.Core">
-      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Core.dll</HintPath>
+      
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.StartupLogicInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.StartupLogicInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.StartupLogicInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="SipcosCommandHandler">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\SipcosCommandHandler.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\SipcosCommandHandler.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Practices.Mobile.ContainerModel">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Microsoft.Practices.Mobile.ContainerModel.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\Microsoft.Practices.Mobile.ContainerModel.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.Core.Authentication">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.Authentication.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.Core.Authentication.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.SipCos.TechnicalConfiguration">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.SipCos.TechnicalConfiguration.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.SipCos.TechnicalConfiguration.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml">
-      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xml.dll</HintPath>
+      
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.DataAccessInterfaces">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.DataAccessInterfaces.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.DataAccessInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.CommonFunctionality">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.CommonFunctionality.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.CommonFunctionality.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

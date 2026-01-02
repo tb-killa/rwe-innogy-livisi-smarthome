@@ -12,19 +12,19 @@
   <ItemGroup />
   <ItemGroup>
     <Reference Include="RWE.SmartHome.SHC.Protocols.Lemonbeat.DomainModel">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Protocols.Lemonbeat.DomainModel.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.Protocols.Lemonbeat.DomainModel.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml">
-      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xml.dll</HintPath>
+      
     </Reference>
     <Reference Include="System.Core">
-      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Core.dll</HintPath>
+      
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.Core">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.Core.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.Core.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.SHC.CommonFunctionality">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.SHC.CommonFunctionality.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.SHC.CommonFunctionality.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

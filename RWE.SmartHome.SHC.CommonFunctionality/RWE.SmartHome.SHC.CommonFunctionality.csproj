@@ -14,19 +14,19 @@
   <ItemGroup />
   <ItemGroup>
     <Reference Include="System.Xml">
-      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xml.dll</HintPath>
+      
     </Reference>
     <Reference Include="SHCWrapperDll">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\SHCWrapperDll.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\SHCWrapperDll.dll</HintPath>
     </Reference>
     <Reference Include="RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE.dll</HintPath>
     </Reference>
     <Reference Include="System.Core">
-      <HintPath>..\..\..\..\..\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Core.dll</HintPath>
+      
     </Reference>
     <Reference Include="Rebex.Common">
-      <HintPath>..\..\..\Downloads\USB Update SHC Classic\shc\Rebex.Common.dll</HintPath>
+      <HintPath>..\\original_dll_libs\\Rebex.Common.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>
