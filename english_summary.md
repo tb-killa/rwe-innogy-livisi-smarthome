@@ -1,11 +1,18 @@
 # SHC v1 NAND analysis - structured technical notes (English)
 
 
+
+
+
+
+
+
 ## Table of contents
 - [Product context (what it is, who made it, and current state)](#product-context-what-it-is-who-made-it-and-current-state)
 - [Hardware](#hardware)
 - [Software stack](#software-stack)
 - [RF protocols and device communication (from decompiled code)](#rf-protocols-and-device-communication-from-decompiled-code)
+- [BidCoS key usage and validation (v1)](#bidcos-key-usage-and-validation-v1)
 - [External context on RF protocols and vendor (public sources)](#external-context-on-rf-protocols-and-vendor-public-sources)
 - [NAND acquisition scope and integrity](#nand-acquisition-scope-and-integrity)
 - [ROM/XIP extraction](#romxip-extraction)
@@ -16,6 +23,7 @@
 - [Certificate carving results (dump scan)](#certificate-carving-results-dump-scan)
 - [Default user PFX (Cluj-SMARTHOME-SHCDefault00001.pfx)](#default-user-pfx-cluj-smarthome-shcdefault00001pfx)
 - [Registry hive certificate stores (hvtool dump)](#registry-hive-certificate-stores-hvtool-dump)
+- [CE certificate store carving (raw NAND)](#ce-certificate-store-carving-raw-nand)
 - [Certificate validity impact (Not After)](#certificate-validity-impact-not-after)
 - [Certificate expiry impact (what would break)](#certificate-expiry-impact-what-would-break)
 - [Certificate expiry impact on device key crypto](#certificate-expiry-impact-on-device-key-crypto)
@@ -41,6 +49,8 @@
 - [settings.config and boot.config (USB update package + dump correlation)](#settingsconfig-and-bootconfig-usb-update-package-dump-correlation)
 - [Device key export (USB CSV exists)](#device-key-export-usb-csv-exists)
 - [Software APIs and internal services (overview)](#software-apis-and-internal-services-overview)
+- [Backend/API endpoints and payloads (v1)](#backendapi-endpoints-and-payloads-v1)
+- [DNS status of backend domains](#dns-status-of-backend-domains)
 - [shc_api.dll (native flash/registry bridge)](#shcapidll-native-flashregistry-bridge)
 - [Internal services and classes (selected map)](#internal-services-and-classes-selected-map)
 - [Internal API map (high-level)](#internal-api-map-high-level)
@@ -89,6 +99,190 @@ The decompiled solution includes several protocol stacks and a SerialAPI layer t
 - **Lemonbeat**: A full Lemonbeat domain model and protocol adapter are present, covering actions, status reports, and state machines.
 
 These stacks are orchestrated through the device communication modules and the protocol multiplexer. This indicates a multi-protocol RF environment where different device families coexist behind a unified control plane.
+
+Board pinout note (community CSV):
+
+- We pulled `RWE_Zentrale_Pinbelegung.csv` and found **ST400** listed as `PB5 (RXD0)` and `PB4 (TXD0)`, which maps to the main CPU UART0 pins.
+- The same file lists **SPI0** on **ST101** (`PA0/PA1/PA2/PA3` for MISO/MOSI/SPCK/NPCS0).
+- The CSV does **not** mention TRX868/CC1101 or explicit GDO0/GDO2 lines, so their exact routing is not confirmed by this file alone.
+
+AT91 pin mapping (from the same CSV):
+
+- **ST400 / UART0**: `PB5` = `RXD0`, `PB4` = `TXD0`
+- **ST101 / SPI0**: `PA0` = `SPI0_MISO`, `PA1` = `SPI0_MOSI`, `PA2` = `SPI0_SPCK`, `PA3` = `SPI0_NPCS0`
+
+Community hardware note (unverified):
+
+- A forum post suggests **ST400** is the serial interface to the AVR, **PRG1** is the ISP programming header, and the **TRX868/CC1101** RF module is wired to the AVR via SPI plus two GPIOs (GDO0/GDO2).
+- This aligns with the AVR firmware observation that SPI-style pins are used and additional GPIOs are toggled, but it is **not confirmed** without a schematic or board trace.
+
+---
+
+## BidCoS key usage and validation (v1)
+Key points from the v1 BidCoS stack:
+
+- **SGTIN is the lookup key**, not the crypto key. It is used to locate the device key, but it does not derive it.
+- **Serial number is display-only** (derived from SGTIN). It does not affect key material.
+- **Device keys are stored encrypted** in `\\NandFlash\\DevicesKeysStorage.csv` and only decrypted after the KeyVault master key is unwrapped.
+- **No plaintext key persistence** for BidCoS nodes. `DefaultKey` is `[XmlIgnore]` and never serialized.
+- **Wsd2LocalKey is random per hub**, not a device key.
+- **Validation is minimal** in the CSV path (Base64 check only).
+
+BidCoS device types present in the v1 codebase (from `BIDCOSSysinfoFrame`):
+
+| Device type | Sysinfo type code | Adapter | Key usage |
+| --- | --- | --- | --- |
+| Eq3BasicSmokeDetector (WSD1) | `0x42` (66) | `WsdAdapter` | No device key retrieval; default key logic is bypassed |
+| Eq3EncryptedSmokeDetector (WSD2) | `0xAA` (170) | `Wsd2Adapter` | DeviceKey used for inclusion, then switch to local key |
+| Eq3EncryptedSiren | `0xF9` (249) | `SirAdapter` | DeviceKey used for inclusion, then switch to local key |
+
+```csharp
+// BIDCOSSysinfoFrame: device type mapping from sysinfo
+switch (m_deviceTypeNumber[1])
+{
+    case 66:
+        deviceType = BIDCOSDeviceType.Eq3BasicSmokeDetector;
+        itemReference = 91419;
+        break;
+    case 170:
+        deviceType = BIDCOSDeviceType.Eq3EncryptedSmokeDetector;
+        itemReference = 91419;
+        break;
+    case 249:
+        deviceType = BIDCOSDeviceType.Eq3EncryptedSiren;
+        itemReference = 97510;
+        break;
+    default:
+        deviceType = BIDCOSDeviceType.Unknown;
+        break;
+}
+```
+
+Code fragments (decompiled):
+
+```csharp
+// DeviceKeyRepository: decrypt per-device key
+byte[] key = DecryptDeviceKey(Convert.FromBase64String(array[2]));
+storedDevice.Sgtin = Convert.FromBase64String(array[0]);
+storedDevice.SerialNumber = array[1];
+storedDevice.Key = key;
+```
+
+```csharp
+// BidCoS WSD2: retrieve and apply device key
+bidCosHandler.bidcosKeyRetriever.GetDeviceKey(
+    SGTIN96.Create(base.Node.Sgtin),
+    key => { base.Node.DefaultKey = key; },
+    null, 5000
+);
+```
+
+```csharp
+// BIDCOSNode: keys are not persisted
+[XmlIgnore]
+public byte[] DefaultKey { get; set; }
+```
+
+```csharp
+// BIDCOSNodeCollection: local WSD2 key is random
+Wsd2LocalKey = new byte[16];
+new Random().NextBytes(Wsd2LocalKey);
+```
+
+Operational implications:
+- Without the KeyVault private key, the encrypted CSV cannot be decrypted, so BidCoS device keys stay unavailable.
+- There is **no serial/SGTIN -> DeviceKey derivation** in the v1 codebase.
+- No default user/passwords exist for BidCoS keys in code; keys are fetched from CSV or backend.
+- **WSD1 does not require a DeviceKey**. The CSV entry can be missing and inclusion still works.
+
+Default credentials or keys:
+- **No default user/passwords** are used for BidCoS devices in this stack.
+- **No static/default DeviceKey** is embedded; keys are retrieved via CSV or backend.
+
+### Backend key exchange (DeviceKey retrieval)
+If a key is missing locally, the SHC uses the KeyExchange service to fetch it by SGTIN:
+
+```csharp
+// KeyExchangeServiceClient: GetDeviceKey flow
+public KeyExchangeResult GetDeviceKey(byte[] sgtin, out byte[] deviceKey)
+{
+    GetDeviceKeyRequest request = new GetDeviceKeyRequest(sgtin);
+    GetDeviceKeyResponse deviceKey2 = GetDeviceKey(request);
+    deviceKey = deviceKey2.deviceKey;
+    return deviceKey2.GetDeviceKeyResult;
+}
+```
+
+Operationally, this means the **backend is the authoritative source** for DeviceKeys when the local CSV does not contain them.
+
+### WSD1 (basic smoke detector)
+WSD1 devices use the standard BidCoS path without per-device key retrieval:
+
+```csharp
+public override bool EnsureCurrentNodeDefaultKey()
+{
+    return true;
+}
+```
+
+Inclusion uses ConfigBegin/ConfigData/ConfigEnd and then group registration. Keys are not requested from CSV for WSD1.
+
+### WSD2 (encrypted smoke detector)
+WSD2 devices request a DeviceKey and then switch from default key to a local key:
+
+```csharp
+public override bool EnsureCurrentNodeDefaultKey()
+{
+    bidCosHandler.bidcosKeyRetriever.GetDeviceKey(
+        SGTIN96.Create(base.Node.Sgtin),
+        key => { base.Node.DefaultKey = key; },
+        null, 5000
+    );
+    return base.Node.DefaultKey != null;
+}
+```
+
+```csharp
+public byte[] CurrentKey()
+{
+    if (base.Included)
+    {
+        return base.Node.UseDefaultKey ? base.Node.DefaultKey : Wsd2LocalKey;
+    }
+    return base.Node.DefaultKey;
+}
+```
+
+During inclusion, the device starts with the **default key**, then `ConfigureNodeKey` installs the **local Wsd2LocalKey** and `UseDefaultKey` flips to `false`.
+
+### Siren (encrypted siren)
+The siren adapter mirrors WSD2 logic but uses the local key as a per-hub "private" key:
+
+```csharp
+public override bool EnsureCurrentNodeDefaultKey()
+{
+    bidCosHandler.bidcosKeyRetriever.GetDeviceKey(SGTIN96.Create(base.Node.Sgtin), UpdateDefaultKey, null, 5000);
+    return base.Node.DefaultKey != null;
+}
+```
+
+```csharp
+public byte[] CurrentKey()
+{
+    if (!base.Included || base.Node.UseDefaultKey)
+    {
+        return base.Node.DefaultKey;
+    }
+    return GetPrivateRandomKey();
+}
+
+private byte[] GetPrivateRandomKey()
+{
+    return bidCosHandler.NodesManager.Wsd2LocalKey;
+}
+```
+
+The siren uses the **device key** during inclusion, then switches to the **local key** for ongoing encrypted traffic.
 
 ---
 
@@ -233,6 +427,77 @@ Certificate:
         dd:62:0d:5e
 ```
 
+We also extracted the embedded log encryption certificate resource (`SHCLogFileEncryptionCertificate`) and inspected it:
+
+```text
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            1c:d5:8c:45:00:00:00:00:00:11
+        Signature Algorithm: sha1WithRSAEncryption
+        Issuer: DC = local, DC = rwe, DC = shmprod, CN = SHMPROD-CA-S
+        Validity
+            Not Before: Oct  6 08:33:32 2010 GMT
+            Not After : Oct  6 08:43:32 2040 GMT
+        Subject: CN = SHCLogFileEncryptionCertificate
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:f5:0a:fb:0d:bb:a3:07:01:b0:1c:18:dd:f1:bb:
+                    4f:4b:8e:22:83:c2:c6:3a:d9:cf:a6:9d:6c:ed:d3:
+                    ab:81:09:87:d7:62:ef:08:f8:ac:f1:a3:d6:b8:28:
+                    ad:cd:8b:d3:f3:fe:70:af:aa:0a:20:3a:78:d6:47:
+                    3e:ff:7a:d9:5c:2b:c6:a3:4f:2a:e8:ee:a6:64:74:
+                    c7:7e:93:88:aa:b0:66:47:b1:96:0f:04:b9:29:c3:
+                    73:e8:49:b4:84:98:52:de:ab:5c:12:22:02:b6:a9:
+                    69:97:1e:96:ca:00:24:b9:01:24:7f:53:21:5a:13:
+                    67:b2:2d:82:ff:63:b3:b4:22:23:15:70:b3:39:db:
+                    a2:c6:81:d3:c8:8c:f3:6c:f1:ef:96:8a:18:08:61:
+                    21:25:6f:dd:b3:39:2e:25:75:e7:fe:fc:bb:80:8e:
+                    7f:94:5b:74:7d:d5:da:e7:ea:2b:a8:b8:84:44:d3:
+                    05:a1:64:dd:7d:05:c8:6f:0a:49:9a:9e:f9:d0:5b:
+                    f3:66:57:66:9b:eb:a7:66:26:5b:75:b6:a4:95:fd:
+                    f1:f3:fa:4a:b9:9d:0e:88:fb:87:0b:11:24:63:06:
+                    29:49:55:9d:d5:0a:7b:3e:00:18:d9:9c:62:03:c4:
+                    6f:66:10:4b:ad:4c:b4:e6:19:31:76:65:f5:a3:e8:
+                    97:43
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Digital Signature, Non Repudiation, Key Encipherment, Data Encipherment
+            S/MIME Capabilities: 
+                050...*.H..
+......0...*.H..
+......0...+....0
+..*.H..
+..
+            X509v3 Subject Key Identifier: 
+                24:11:6E:90:1C:2E:12:5F:17:B0:BA:00:B3:74:C9:C9:01:72:CE:C4
+            X509v3 Authority Key Identifier: 
+                70:F0:EC:F6:4F:D2:30:C9:04:2D:B5:B6:00:6F:D2:27:23:45:4C:61
+            X509v3 Basic Constraints: critical
+                CA:FALSE
+    Signature Algorithm: sha1WithRSAEncryption
+    Signature Value:
+        49:3e:92:49:87:0d:0f:27:98:c9:6a:65:f8:b7:7d:b9:67:cc:
+        ba:0b:72:fe:00:65:cb:38:d7:dd:75:80:17:55:c6:57:f4:9d:
+        09:02:21:8b:ae:95:d9:55:0c:cf:64:12:e9:6d:cc:64:a4:36:
+        74:41:a4:9d:78:f7:a4:32:10:a6:ba:16:04:8e:24:94:c2:b0:
+        ef:38:6e:46:82:ef:15:c8:9f:a1:6c:4d:08:b8:bc:b6:41:cb:
+        d0:3d:e9:2d:e9:80:3b:98:89:ba:96:7f:66:c3:9c:bd:d0:ea:
+        5b:dd:af:02:6a:ba:07:5b:fc:ea:a5:c8:26:e0:36:da:48:be:
+        65:5a:95:d5:d8:bf:7b:3b:f1:7a:06:68:88:60:f0:1d:bc:98:
+        29:55:dc:25:7c:1f:e1:b3:64:8c:a3:48:48:d4:3f:0a:89:a7:
+        ff:19:2b:5c:fa:f6:b2:27:d6:8b:db:d0:56:4a:6a:20:8a:84:
+        f6:ab:c1:72:a1:d2:dd:08:38:30:49:d5:8b:73:56:b4:01:33:
+        ce:38:53:84:82:03:17:a4:ec:54:aa:dc:d4:2d:f8:92:a3:8b:
+        13:75:44:46:ce:c4:f6:40:bf:b5:76:fd:20:cb:14:c1:21:0c:
+        a9:0e:c7:32:d6:ef:31:bd:63:94:8f:dc:43:b2:18:e3:4c:53:
+        2a:bc:54:7e
+```
+
 ---
 
 ## Certificate carving results (dump scan)
@@ -243,7 +508,7 @@ We scanned the NAND dump directly for PEM blocks and DER-encoded X.509 sequences
 - **PFX/PKCS12**: no valid PKCS12 containers detected.
 - **Private keys**: a single DER-encoded RSA private key was detected (1024-bit). It does **not** match any carved certificate modulus and is not a PKCS12 bundle. Likely a standalone/test key or unrelated artifact. Offset in dump: `0xC544BCB`.
 - **PKCS#8 (encrypted)**: four PKCS#8 encrypted key blobs were carved. All report OID `1.2.840.113549.1.12.1.3` (pbeWithSHAAnd3-KeyTripleDES-CBC). Without the passphrase, contents remain opaque; they may be false positives or unrelated encrypted blobs.
-- **Cert backup paths**: no `CertBackupLocal` / `CertBackupUser` strings or files found in the raw dump; only the paths appear as strings inside `shc_api.dll`.
+- **Cert backup paths**: UTF-16LE strings for `\NandFlash\CertBackupLocal` / `\NandFlash\CertBackupUser` appear in OS message strings, but no backing files or PFX blobs were found in the raw dump.
 - **P7B bundles**: extracted `shc_root_certs.p7b`, `shc_ca_certs.p7b`, `shc_codesign_certs.p7b`, and `sysroots.p7b` to PEM. No private key markers were present. Example subjects include `RWE_SmartHome_SHC_Codesigning`, `SHMPROD-CA-S`, and `SHMPROD-CA-E`.
 - **PKCS#8 passphrases**: tested a small set of common/default passphrases (empty, `password`, `123456`, `shc`, `smarthome`, `livisi`, `rwe`, `innogy`, `osboxes.org`, etc.) and none unlocked the PKCS#8 blobs.
 - **Next step (offline)**: run a larger wordlist with hashcat/John against the PKCS#8 blobs; requires a proper PBE hash extraction and a curated wordlist.
@@ -357,6 +622,15 @@ We converted `boot.hv`, `default.hv`, and `user.hv` to `.reg` using `hvtool` and
 - TPM CSP is registered as `SHC Trusted Platform Module Cryptographic Service Provider`.
 
 No `CertBackupLocal` / `CertBackupUser` keys or private-key container references appeared in these hives, reinforcing that private keys are not stored as exportable blobs in the NAND image.
+
+## CE certificate store carving (raw NAND)
+We did a raw NAND scan for certificate-store artifacts and ASN.1 blobs:
+
+- UTF-16LE hits for `\NandFlash\CertBackupUser` / `\NandFlash\CertBackupLocal` appear only inside OS log/diagnostic strings (backup/restore messages). No actual backup files or PFX blobs were located in the dump.
+- Extracted 421 ASN.1 DER candidates; 48 parse as valid X.509 certs. The parsed list is in `analysis/certs_from_dump/parsed_certs.txt`.
+- Found one PKCS#1 RSA private key at offset `0x0C544BCB` (607 bytes, 1024-bit). OpenSSL parses it as a private key, but its modulus does **not** match any extracted certs. Nearby strings reference `support@rebex.net`, suggesting a test/sample key rather than a device identity key.
+- `support@rebex.net` appears to be a Rebex software vendor contact (Rebex provides .NET networking/security libraries). This strengthens the interpretation that the key/cert pair is a bundled test/sample artifact, not a device-unique key.
+- No PEM blocks and no PKCS#12 containers were detected in the raw dump.
 
 ---
 
@@ -720,6 +994,24 @@ WriteLogfile();                 // writes Info + Content
 WriteSignature();               // RSA signature over hashed content
 ```
 
+Resource usage (actual code paths):
+
+```csharp
+// LogExporter.GetEncryptionCertificate
+encryptionCertificate =
+    Certificate.CreateFromPemFile(Resources.SHCLogFileEncryptionCertificate);
+
+// LogExporter.WriteEncryptionKey
+RSACryptoServiceProvider rsa = (RSACryptoServiceProvider)encryptionCertificate.PublicKey;
+byte[] keyiv = new byte[aes128.Key.Length + aes128.IV.Length];
+Array.Copy(aes128.Key, keyiv, aes128.Key.Length);
+Array.Copy(aes128.IV, 0, keyiv, aes128.Key.Length, aes128.IV.Length);
+byte[] wrapped = rsa.Encrypt(keyiv, fOAEP: false);
+WriteBinHex(wrapped); // stored in <EncryptionKey>
+```
+
+We exported the embedded certificate to `extracted_resources/SHCLogFileEncryptionCertificate.pem` (1364 bytes) for analysis.
+
 If the encryption certificate is present, AES-128 is used to encrypt log content and the AES key+IV are RSA-encrypted into the XML. The signing cert is the device cert (personal or default) and is used to sign the hashed payload. This is conceptually similar to the KeyVault pattern (AES content + RSA-wrapped AES key).
 
 ---
@@ -728,6 +1020,10 @@ If the encryption certificate is present, AES-128 is used to encrypt log content
 The log export path always tries to load the encryption certificate from embedded resources (`SHCLogFileEncryptionCertificate`). If it is present, the log content is encrypted with AES-128 and a signature is attached. If it is missing, the export falls back to plaintext content and still signs the hash. Because the encryption cert is compiled into the resources, encryption is effectively the default behavior on standard builds.\n
 
 This also means the log encryption certificate is **not expected to be in NAND as a separate file**; it is embedded in the application resources. The private key needed to decrypt exported logs would be held by whoever owns the corresponding encryption certificate private key, not by the SHC itself.\n
+
+**Decryption feasibility (with current material)**
+
+Because the AES key+IV are RSA-wrapped using the **public** log encryption certificate, decryption requires the **private key** for `SHCLogFileEncryptionCertificate`. That private key is not present in the NAND dump or embedded resources we extracted. With the current artifacts, encrypted log exports can be parsed and verified structurally, but they cannot be decrypted.
 
 ---
 
@@ -827,6 +1123,7 @@ Signature / integrity behavior (from decompiled code):
 
 - `settings.config` embeds a `<Signature>` hex blob. The `ConfigSignature` helper computes SHA1 over `<Sections>` and verifies with **any** cert in the `CodeSign` store. The hard-coded thumbprint constant exists but is unused.\n
 - **No call sites** were found for `ConfigSignature` in the decompiled managed code; `ConfigurationManager` loads `settings.config` without validating the signature.\n
+- `SettingsFileHelper.ShouldRegisterBackendRequests()` reads `settings.config` directly and falls back to a hard-coded cutoff date on errors; it does not validate the signature.\n
 - `boot.config` is loaded directly by `ModuleLoader` and **no signature or hash check** is performed in managed code.
 
 Encryption status:
@@ -1004,6 +1301,278 @@ These are the core APIs the decompiled code relies on for update handling, certi
 
 ---
 
+## Backend/API endpoints and payloads (v1)
+The backend communication stack uses **WCF SOAP** clients generated by `NetCFSvcUtil`. It is **not** a REST/JSON API. Each client has a default `EndpointAddress` set to `https://localhost/Service`, which suggests the real backend URLs are injected at runtime (config or provisioning). The only concrete host hard-coded in code is the SMS service:
+
+- `https://sh70a0100.shmtest.rwe.local/PublicFacingServicesShc/SmsServices/SendSmsService.svc`
+
+In practice, the SHC calls SOAP services defined by their action URIs (namespaces under `http://rwe.com/SmartHome/...`). Below is the action map extracted from the service clients.
+
+**Service action map (from the decompiled clients)**
+
+- **KeyExchangeService** (`SmartHome.SHC.BackendCommunication.KeyExchangeScope`)
+  - `.../IKeyExchangeService/EncryptNetworkKey`
+  - `.../IKeyExchangeService/GetDeviceKey`
+  - `.../IKeyExchangeService/GetMasterKey`
+  - `.../IKeyExchangeService/GetDevicesKeys`
+- **ConfigurationService** (`...ConfigurationScope`)
+  - `.../IConfigurationService/GetShcSyncRecord`
+  - `.../IConfigurationService/ConfirmShcSyncRecord`
+  - `.../IConfigurationService/SetManagedSHCConfiguration`
+  - `.../IConfigurationService/AddManagedSHCConfiguration`
+  - `.../IConfigurationService/SetUnmanagedSHCConfiguration`
+  - `.../IConfigurationService/DeleteManagedSHCConfiguration`
+  - `.../IConfigurationService/DeleteUnmanagedSHCConfiguration`
+  - `.../IConfigurationService/GetManagedSHCConfiguration`
+  - `.../IConfigurationService/GetUnmanagedSHCConfiguration`
+  - `.../IConfigurationService/GetRestorePointShcConfiguration`
+- **DeviceManagementService** (`...DeviceManagementScope`)
+  - `.../IDeviceManagementService/UploadLogFile`
+  - `.../IDeviceManagementService/UploadSystemInfo`
+- **SoftwareUpdateService** (`...SoftwareUpdateScope`)
+  - `.../ISoftwareUpdateService/CheckForSoftwareUpdate`
+  - `.../ISoftwareUpdateService/ShcSoftwareUpdated`
+- **DeviceUpdateService** (`...DeviceUpdateScope`)
+  - `.../IDeviceUpdateService/CheckForDeviceUpdate`
+- **ShcInitializationService** (`...ShcIntializationScope`)
+  - `.../IShcInitializationService/SubmitCertificateRequest`
+  - `.../IShcInitializationService/RetrieveInitializationData`
+  - `.../IShcInitializationService/ConfirmShcOwnership`
+  - `.../IShcInitializationService/ShcResetByOwner`
+  - `.../IShcInitializationService/SubmitOwnershipRequest`
+  - `.../IShcInitializationService/RetrieveOwnershipData`
+- **ShcMessagingService** (`...ShcMessagingScope`)
+  - `.../IShcMessagingService/SendSmokeDetectionNotification`
+  - `.../IShcMessagingService/SendSmokeDetectionNotification14`
+  - `.../IShcMessagingService/SendNotificationEmail`
+  - `.../IShcMessagingService/SendEmail`
+  - `.../IShcMessagingService/SendSystemEmail`
+  - `.../IShcMessagingService/GetEmailRemainingQuota`
+- **NotificationService** (`...NotificationScope`)
+  - `.../INotificationService/SendNotifications`
+  - `.../INotificationService/SendSystemNotifications`
+- **PublicStorage / DataTracking** (`...PublicStorageScope`)
+  - `.../IDataTrackingService/StoreData`
+  - `.../IDataTrackingService/StoreListData`
+- **PublicStorage / DAL** (`...PublicStorageScope`)
+  - `.../IDalStorageService/StoreDeviceActivityLog`
+  - `.../IDalStorageService/PurgeDeviceActivityLog`
+- **SmsService** (`...SmsScope`)
+  - `.../ISmsService/SendSystemSms`
+  - `.../ISmsService/SendSms`
+  - `.../ISmsService/GetSmsRemainingQuota`
+- **ApplicationTokenService** (`...ApplicationTokenScope`)
+  - `.../IApplicationTokenService/GetApplicationToken`
+  - `.../IApplicationTokenService/GetApplicationTokenHash`
+
+**Configured endpoints (from USB Update SHC Classic config)**
+
+The update package includes `USB Update SHC Classic\\shc\\settings.config`, which provides concrete service URLs used at runtime. These appear to override the `https://localhost/Service` defaults in the generated clients.
+
+- `DeviceManagementServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/DeviceManagementService.svc`
+- `ConfigurationServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ConfigurationService.svc`
+- `SoftwareUpdateServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/SoftwareUpdateService.svc`
+- `KeyExchangeServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/KeyExchangeService.svc`
+- `ShcInitializationServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ShcInitializationService.svc`
+- `ShcMessagingServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ShcMessagingService.svc`
+- `ApplicationTokenServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ApplicationManagement/ApplicationTokenService.svc`
+- `DeviceUpdateServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/DeviceUpdateService.svc`
+- `NotificationServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/Notifications/NotificationService.svc`
+- `DataTrackingClientUrl` -> `https://storage.services-smarthome.de/PublicStorageServices/DataTrackingService.svc`
+- `SmsServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/SmsServices/SendSmsService.svc`
+- `RelayServerUrl` -> `wss://gateway.services-smarthome.de/API/1.0/shcconnection/connect`
+
+Other backend-related settings in the same file:
+
+- `CertificateUpnSuffix` -> `shmprod.rwe.local` (UPN suffix used in certificate enrollment)
+- `StopBackendRequestsDate` -> `3/1/2024` (cutoff for backend requests)
+- `WebServiceHost` has `ClientId` and `ClientSecret` set to `clientId` / `clientPass` (likely placeholders)
+
+The same endpoint block was also recovered from the NAND dump via carved `settings.config` fragments, so these URLs are present on-device and not only in the USB update package.
+
+`USB Update SHC Classic\\shc\\boot.config` does not list any URLs; it only defines module startup order and log levels.
+
+**Endpoint matrix (URL -> service role / action family)**
+
+| URL (settings.config) | Service role | Action family |
+| --- | --- | --- |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/DeviceManagementService.svc` | DeviceManagementService | UploadLogFile, UploadSystemInfo |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ConfigurationService.svc` | ConfigurationService | Get/Set/Delete Managed/Unmanaged config, sync record |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/SoftwareUpdateService.svc` | SoftwareUpdateService | CheckForSoftwareUpdate, ShcSoftwareUpdated |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/KeyExchangeService.svc` | KeyExchangeService | GetDeviceKey, GetMasterKey, GetDevicesKeys, EncryptNetworkKey |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ShcInitializationService.svc` | ShcInitializationService | SubmitCertificateRequest, RetrieveInitializationData, ownership flows |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ShcMessagingService.svc` | ShcMessagingService | Send email notifications, quotas |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ApplicationManagement/ApplicationTokenService.svc` | ApplicationTokenService | GetApplicationToken, GetApplicationTokenHash |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/DeviceUpdateService.svc` | DeviceUpdateService | CheckForDeviceUpdate |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/Notifications/NotificationService.svc` | NotificationService | SendNotifications, SendSystemNotifications |
+| `https://storage.services-smarthome.de/PublicStorageServices/DataTrackingService.svc` | DataTrackingService | StoreData, StoreListData |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/SmsServices/SendSmsService.svc` | SmsService | SendSms, SendSystemSms, GetSmsRemainingQuota |
+| `wss://gateway.services-smarthome.de/API/1.0/shcconnection/connect` | RelayServer | WSS relay connection bootstrap |
+
+**Reachability/deprecation note (config-only)**
+
+- `StopBackendRequestsDate` is set to `3/1/2024`, which implies the software will stop sending backend requests after that date even if URLs remain configured.
+- There are no per-endpoint disable flags in `settings.config`, so the only explicit global cutoff we see is `StopBackendRequestsDate`.
+- Treat endpoint reachability as "unknown/likely decommissioned" after the cutoff; the config alone cannot confirm live availability.
+
+**Security note (DNS spoofing and TLS)**
+
+This report does not assess or recommend interception techniques. From the managed code we do not see an explicit "accept all certificates" or TLS bypass. The stack relies on WCF + the TLS library and the device certificate store, so standard certificate validation is expected unless bypassed elsewhere (native code or TLS library behavior not visible here).
+
+**Config tampering caveat**
+
+`settings.config` contains a `<Signature>` element. If the application verifies this signature on load, altering `StopBackendRequestsDate` or service URLs will likely be rejected. The decompiled managed code does not show the signature verification path, so the enforcement point remains unknown from this layer alone.
+
+---
+
+## DNS status of backend domains
+We rechecked public DNS resolution for the backend hostnames referenced in `settings.config`:
+
+- `services-smarthome.de` and `gateway.services-smarthome.de` return **SERVFAIL** from public resolvers.
+  - `nslookup services-smarthome.de 1.1.1.1` -> "Server failed"
+  - `nslookup services-smarthome.de 8.8.8.8` -> "Server failed"
+  - Same result for `gateway.services-smarthome.de`
+- With SERVFAIL, no A/AAAA/MX/TXT/SRV records can be obtained from public resolvers.
+- NS/SOA/MX queries also fail with SERVFAIL via public resolvers, so the current authoritative chain cannot be confirmed from this host.
+
+Interpretation:
+
+- The domain is registered and appears delegated (per earlier WHOIS notes), but public DNS resolution currently fails.
+- This can be caused by DNSSEC/zone misconfiguration or by intentional restriction (authoritative servers refusing public queries).
+- Without authoritative answers, we cannot confirm current service availability or decommissioning from DNS alone.
+
+WHOIS/RDAP snapshot (DENIC RDAP):
+
+- Status: `active`
+- Last changed: `2020-12-14T10:20:11+01:00`
+
+Reported DNS configuration (unverified from current resolvers):
+
+- Previous checks (reported) indicated Azure DNS nameservers:
+  - `ns1-02.azure-dns.com`
+  - `ns2-02.azure-dns.net`
+  - `ns3-02.azure-dns.org`
+  - `ns4-02.azure-dns.info`
+- Because public DNS queries currently SERVFAIL, these NS values could not be revalidated on this machine.
+
+**Payload shapes (examples from the generated request/response classes)**
+
+Key exchange (SGTIN to DeviceKey):
+
+```csharp
+[XmlRoot("GetDeviceKey", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class GetDeviceKeyRequest
+{
+    [XmlElement(DataType="base64Binary")]
+    public byte[] sgtin;
+}
+
+[XmlRoot("GetDeviceKeyResponse", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class GetDeviceKeyResponse
+{
+    public KeyExchangeResult GetDeviceKeyResult;
+    [XmlElement(DataType="base64Binary")]
+    public byte[] deviceKey;
+}
+```
+
+Certificate enrollment:
+
+```csharp
+[XmlRoot("SubmitCertificateRequest", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class SubmitCertificateRequestRequest
+{
+    public string shcSerial;
+    public string pin;
+    public string certificateRequest;
+}
+
+[XmlRoot("SubmitCertificateRequestResponse", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class SubmitCertificateRequestResponse
+{
+    public InitializationErrorCode SubmitCertificateRequestResult;
+    public string sessionToken;
+}
+```
+
+Initialization polling result (cloud -> SHC):
+
+```csharp
+[XmlRoot("RetrieveInitializationDataResponse", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class RetrieveInitializationDataResponse
+{
+    public InitializationErrorCode RetrieveInitializationDataResult;
+    public string issuedCertificate;
+    public ShcSyncRecord shcSyncRecord;
+    public bool furtherPollingRequired;
+    public int pollAfterSeconds;
+}
+
+public class ShcSyncRecord
+{
+    public ShcRole[] Roles;
+    public ShcUser[] Users; // includes PasswordHash in each ShcUser
+}
+```
+
+Software update metadata (cloud -> SHC):
+
+```csharp
+public class UpdateInfo
+{
+    public UpdateCategory Category;
+    public string DownloadLocation;
+    public string DownloadUser;
+    public string DownloadPassword;
+    public UpdateType Type;
+    public DateTime UpdateDeadline;
+    public string Version;
+}
+```
+
+Log upload (SHC -> cloud):
+
+```csharp
+[XmlRoot("UploadLogFile", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class UploadLogFileRequest
+{
+    public string shcSerial;
+    [XmlElement(DataType="base64Binary")]
+    public byte[] content;
+    public int currentPackage;
+    public int nextPackage;
+    public string correlationId;
+}
+```
+
+Device update lookup (SHC -> cloud):
+
+```csharp
+public class DeviceDescriptor
+{
+    public string AddInVersion;
+    public string CurrentFirmwareVersion;
+    public string HardwareVersion;
+    public short Manufacturer;
+    public int ProductId;
+}
+
+public class DeviceUpdateInfo
+{
+    public string ImageChecksum;
+    public string ImageUrl;
+    public string ReleaseNotesLocation;
+    public DeviceUpdateType UpdateType;
+    public string VersionNumber;
+}
+```
+
+**WebSocket channel**
+
+`WebSocketSecureClient` performs an HTTPS handshake, reads a `Location:` header, and converts it to `wss://` before establishing the WebSocket connection. This implies a redirect-based WSS bootstrap rather than a hard-coded WSS endpoint in the binary.
+
+---
+
 ## shc_api.dll (native flash/registry bridge)
 We extracted a **full native WinCE ARM** `shc_api.dll` from the dump. The two copies in the workspace are byte‑identical (SHA‑256 match), so the ROM extraction is consistent.
 
@@ -1103,6 +1672,179 @@ The decompiled assemblies include embedded resources that carry important trust 
 - Application defaults and configuration strings.\n
 
 This is why some certificates do not appear as standalone files in NAND; they live inside the managed binaries.
+
+Resource files (resx) overview (decompiled):
+
+- **Core trust store bundle**: `RWE.SmartHome.SHC.Core.Properties.Resources.resx` contains 10 binary blobs (`System.Byte[]`) with CA/root material, including `DigiCertGlobalRootCA`, `DigiCertGlobalRootG2`, `MicrosoftRSARootCA2017`, `MicrosoftEVECCRootCA2017`, `DTRUSTRootClass3CA22009`, `SHCRootCA_VerisignNew`, `SHCSubCA_VerisignNew`, plus `shc_ca_certs` and `shc_root_certs`.
+- **Log encryption cert**: `RWE.SmartHome.SHC.BusinessLogic.Properties.Resources.resx` contains a single binary blob `SHCLogFileEncryptionCertificate` (used by `LogExporter`).
+- **Serial resource**: `RWE.SmartHome.SHC.BusinessLogic.Resources.Resources.resx` contains a single binary blob named `Serial` (used by the business logic layer).
+- **Logging pattern**: `RWE.SmartHome.SHC.BusinessLogic.Properties.Resource.resx` contains `LogEntryPattern` (string pattern for log entries).
+- **DataAccess schema strings**: `RWE.SmartHome.SHC.DataAccess.Properties.Resources.resx` contains 41 string entries, including schema/table names like `LogicalDevicesXml`, `DeviceActivityLogs`, and `ApplicationsSettings`.
+- **Auth and error strings**: multiple `*.ErrorStrings.resx` and `ErrorResources.resx` files contain localized or constant error messages and labels.
+- **Dependency resources**: the Microsoft.Practices Mobile ContainerModel resource file contains a few string error messages.
+
+Overall, the embedded resources are mostly strings plus a small set of binary blobs for trust and log encryption. This explains why several certs are present in the binaries even when not found as standalone files in NAND.
+
+**Coprocessor firmware blob (Serial)**
+
+The `Serial` resource (32,768 bytes) is used as the AVR coprocessor firmware image during updates. The updater validates a CRC over the blob and then flashes it.
+
+```csharp
+// CoprocessorUpdater.CheckCoprocImageIntegrity
+byte[] serial = Resources.Serial;
+foreach (byte val in serial) crc.CRC16_update(val);
+string text = crc.CRC16_High.ToString(\"X2\") + crc.CRC16_Low.ToString(\"X2\");
+if (text != configuration.TargetCoprocessorChecksum)
+    throw new CoprocessorUpdateException(...);
+
+// CoprocessorUpdater.FlashCoprocessor
+using MemoryStream data_to_write = new MemoryStream(Resources.Serial);
+isFlashingSuccessful = AVRFirmwareManager.UpdateAVR(data_to_write);
+```
+
+We exported the blob to `extracted_resources/Serial.bin` for further inspection.
+
+**Serial.bin deep analysis (AVR image)**
+
+Binary characteristics:
+
+- Size: 32,768 bytes (0x8000), typical of AVR flash images.
+- Entropy: ~5.45 bits/byte (not compressed/encrypted).
+- Padding: large 0xFF region from 0x51A6 (10,842 bytes) and 0x00 tail from 0x7C00 (1,024 bytes).
+- Code region: non-0xFF/0x00 data from ~0x0100 to ~0x506C.
+
+Vector table (assuming 4-byte slots, 26 entries at 0x0000-0x0067):
+
+```
+v00 @0x0000: JMP 0x4DD4
+v01 @0x0004: JMP 0x0842
+v02 @0x0008: JMP 0x0850
+v03 @0x000C: RETI
+v04 @0x0010: RETI
+v05 @0x0014: RETI
+v06 @0x0018: JMP 0x0B36
+v07 @0x001C: RETI
+v08 @0x0020: RETI
+v09 @0x0024: RETI
+v10 @0x0028: RETI
+v11 @0x002C: RETI
+v12 @0x0030: RETI
+v13 @0x0034: RETI
+v14 @0x0038: JMP 0x0B08
+v15 @0x003C: RETI
+v16 @0x0040: RETI
+v17 @0x0044: RETI
+v18 @0x0048: JMP 0x0CF0
+v19 @0x004C: RETI
+v20 @0x0050: JMP 0x0CE4
+v21 @0x0054: RETI
+v22 @0x0058: RETI
+v23 @0x005C: RETI
+v24 @0x0060: RETI
+v25 @0x0064: RETI
+```
+
+Disassembly samples (avr-objdump, -b binary -m avr):
+
+```
+00000000: 0c 94 ea 26  jmp  0x4dd4
+00000004: 0c 94 21 04  jmp  0x0842
+00000008: 0c 94 28 04  jmp  0x0850
+0000000c: 18 95        reti
+...
+00004dd4: 0f e9        ldi  r16, 0x9F
+00004dd6: 0d bf        out  0x3d, r16
+00004de0: 0e 94 01 28  call 0x5002
+00004df4: 0c 94 e7 26  jmp  0x4dce
+```
+
+Likely MCU family:
+
+- The 0x8000 image size and 26-vector table are consistent with an AVR ATmega328-class device (avr5 family). This is a best-fit identification based on vector count and flash size; the exact MCU is not confirmed in the dump.
+- I/O register usage aligns with ATmega328p UART0 mapping (I/O 0x20-0x22 for UCSR0A/B/C, 0x24 for UBRR0L, 0x26 for UDR0) and stack pointer setup via I/O 0x3D/0x3E (SPL/SPH).
+- Field note: the board uses a **16 MHz external crystal**, which matches the low fuse setting `0xFF` (external full-swing oscillator, CKDIV8 disabled).
+
+```asm
+4e04: out 0x21, r20    ; UCSR0B
+4e06: out 0x22, r21    ; UCSR0C
+4e28: out 0x20, r16    ; UCSR0A
+a90:  out 0x24, r17    ; UBRR0L
+a9a:  out 0x26, r16    ; UDR0
+```
+
+Bootloader hints:
+
+- No `spm` instruction found in the binary; this suggests the blob is an application image only, not a self-programming bootloader.
+- The SHC v2 file `serial_v0.e.bin` is byte-identical to `Serial.bin` (same SHA-256).
+
+**I/O usage and pin hints (AVR I/O space)**
+
+Observed low I/O address usage (from disassembly):
+
+- 0x03/0x04/0x05 (PINB/DDRB/PORTB) with bit ops on PORTB:
+  - `sbi 0x05,2`, `cbi 0x05,2` (PB2)
+  - `cbi 0x05,3` (PB3)
+  - `sbi 0x05,5` (PB5)
+  - `sbic 0x03,4` (PB4 input)
+- 0x07/0x08 (DDRC/PORTC) touched, suggesting PORTC lines are configured.
+- 0x09/0x0B (PIND/PORTD) touched, indicating PORTD use.
+- 0x20-0x27 used for UART0 registers (UCSR0A/B/C, UBRR0L, UDR0).
+- 0x3D/0x3E and 0x3F used (SPL/SPH, SREG).
+
+If the MCU is ATmega328p, PB2/PB3/PB4/PB5 correspond to the SPI pin group (SS/MOSI/MISO/SCK). The pattern of toggling PB2/PB3/PB5 and reading PB4 is consistent with SPI-style signaling, but the exact peripheral wiring still depends on the board.
+
+**Coprocessor flashing protocol (from decompiled code)**
+
+The SHC does **not** use a UART bootloader. It programs the AVR coprocessor via **SPI ISP** using classic AVR ISP commands. The code streams raw binary data and writes flash in 64-word (128-byte) pages.
+
+Key steps and commands (from `AVRFirmwareManager`):
+
+```csharp
+// 1) Programming enable
+// 0xAC 0x53 0x00 0x00
+array[0] = 0xAC; array[1] = 0x53; array[2] = 0x00; array[3] = 0x00;
+
+// 2) Chip erase
+// 0xAC 0x80 0x00 0x00
+array[0] = 0xAC; array[1] = 0x80; array[2] = 0x00; array[3] = 0x00;
+
+// 3) Poll ready
+// 0xF0 0x00 0x00 0x00
+array[0] = 0xF0; array[1] = 0x00; array[2] = 0x00; array[3] = 0x00;
+```
+
+Flash write loop (raw binary, 2 bytes at a time):
+
+```csharp
+short addr = 0;
+short pageWords = 64; // 128 bytes
+
+// Load program memory (low/high byte)
+// low:  0x40 0x00 addr data
+// high: 0x48 0x00 addr data
+SendDataByte(data, (byte)(addr & 0x3F), bDataHigh: false);
+SendDataByte(data, (byte)(addr & 0x3F), bDataHigh: true);
+addr++;
+
+// When addr % 64 == 0, write page:
+// 0x4C high_addr low_addr 0x00
+WritePage((short)(addr - pageWords));
+```
+
+Optional fuse/lock programming (present but not used in update flow):
+
+```csharp
+// 0xAC 0xE0 = lock bits
+// 0xAC 0xA0 = low fuse
+// 0xAC 0xA8 = high fuse
+// 0xAC 0xA4 = extended fuse
+WriteLockFuseBits(LockType.LOCK, lockBits);
+WriteLockFuseBits(LockType.LOW, fuseLow);
+WriteLockFuseBits(LockType.HIGH, fuseHigh);
+WriteLockFuseBits(LockType.EXTENDED, fuseExt);
+```
+
+Conclusion: the coprocessor is programmed with **SPI ISP**, not a serial bootloader. The `Serial.bin` blob is a raw AVR application image and is flashed directly.
 
 ---
 

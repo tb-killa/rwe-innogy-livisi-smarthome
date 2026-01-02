@@ -1,11 +1,18 @@
 # SHC v1 NAND Analyse - strukturierte technische Notizen (Deutsch)
 
 
+
+
+
+
+
+
 ## Inhaltsverzeichnis
 - [Produktkontext (was es ist, Hersteller, aktueller Status)](#produktkontext-was-es-ist-hersteller-aktueller-status)
 - [Hardware](#hardware)
 - [Software-Stack](#software-stack)
 - [RF-Protokolle und Geraetekommunikation (aus Code)](#rf-protokolle-und-geraetekommunikation-aus-code)
+- [BidCoS Key-Verwendung und Validierung (v1)](#bidcos-key-verwendung-und-validierung-v1)
 - [Externer Kontext zu RF-Protokollen und Vendor (oeffentliche Quellen)](#externer-kontext-zu-rf-protokollen-und-vendor-oeffentliche-quellen)
 - [NAND-Akquisition und Integritaet](#nand-akquisition-und-integritaet)
 - [ROM/XIP Extraktion](#romxip-extraktion)
@@ -16,6 +23,7 @@
 - [Zertifikats-Carving (Dump-Scan)](#zertifikats-carving-dump-scan)
 - [Default-User PFX (Cluj-SMARTHOME-SHCDefault00001.pfx)](#default-user-pfx-cluj-smarthome-shcdefault00001pfx)
 - [Registry-Hives und Cert-Stores (hvtool Dump)](#registry-hives-und-cert-stores-hvtool-dump)
+- [CE-Zertifikatsspeicher-Carving (Raw NAND)](#ce-zertifikatsspeicher-carving-raw-nand)
 - [Zertifikatsgueltigkeit (Not After)](#zertifikatsgueltigkeit-not-after)
 - [Ablaufdatum - moegliche Auswirkungen](#ablaufdatum-moegliche-auswirkungen)
 - [Ablaufdatum und DeviceKey-Krypto](#ablaufdatum-und-devicekey-krypto)
@@ -40,6 +48,8 @@
 - [settings.config und boot.config (USB-Update + Dump-Korrelation)](#settingsconfig-und-bootconfig-usb-update-dump-korrelation)
 - [DeviceKey Export (USB CSV vorhanden)](#devicekey-export-usb-csv-vorhanden)
 - [Software APIs und interne Services (Ueberblick)](#software-apis-und-interne-services-ueberblick)
+- [Backend/API-Endpunkte und Payloads (v1)](#backendapi-endpunkte-und-payloads-v1)
+- [DNS-Status der Backend-Domains](#dns-status-der-backend-domains)
 - [shc_api.dll (native Flash/Registry Bridge)](#shcapidll-native-flashregistry-bridge)
 - [Interne API-Landkarte (High-Level)](#interne-api-landkarte-high-level)
 - [Interne Klassen (ausgewaehlte Kernbausteine)](#interne-klassen-ausgewaehlte-kernbausteine)
@@ -89,6 +99,190 @@ Im dekompilierten Code sind mehrere Protokoll-Stacks und eine SerialAPI-Schicht 
 - **Lemonbeat**: Lemonbeat-DomainModel und Protokolladapter mit Actions/Status/StateMachines.
 
 Das zeigt eine Multi-Protokoll-Architektur, bei der unterschiedliche RF-Geraetefamilien ueber eine gemeinsame Kontrollschicht angebunden werden.
+
+Board-Pinout Hinweis (Community CSV):
+
+- `RWE_Zentrale_Pinbelegung.csv` listet **ST400** als `PB5 (RXD0)` und `PB4 (TXD0)`; das sind UART0 Pins des Main CPU.
+- Die gleiche Datei listet **SPI0** an **ST101** (`PA0/PA1/PA2/PA3` fuer MISO/MOSI/SPCK/NPCS0).
+- In der CSV stehen **keine** TRX868/CC1101 oder GDO0/GDO2 Hinweise, die exakte Leitung ist damit dort nicht belegt.
+
+AT91 Pin-Mapping (aus der gleichen CSV):
+
+- **ST400 / UART0**: `PB5` = `RXD0`, `PB4` = `TXD0`
+- **ST101 / SPI0**: `PA0` = `SPI0_MISO`, `PA1` = `SPI0_MOSI`, `PA2` = `SPI0_SPCK`, `PA3` = `SPI0_NPCS0`
+
+Community-Hardware-Hinweis (unverifiziert):
+
+- Ein Forenbeitrag beschreibt **ST400** als serielle Schnittstelle zum AVR, **PRG1** als ISP-Programmierheader, und das **TRX868/CC1101** Funkmodul per SPI plus zwei GPIOs (GDO0/GDO2) am AVR.
+- Das passt grob zu den Firmware-Hinweisen (SPI-Style I/O und weitere GPIO-Nutzung), ist aber **nicht bestaetigt** ohne Schaltplan oder Board-Trace.
+
+---
+
+## BidCoS Key-Verwendung und Validierung (v1)
+Kernpunkte aus dem v1 BidCoS-Stack:
+
+- **SGTIN ist der Lookup-Key**, nicht der Kryptoschluessel. Er dient nur zur Zuordnung des DeviceKeys.
+- **Seriennummer ist Anzeige-Logik** (aus SGTIN abgeleitet) und beeinflusst keine Schluessel.
+- **Device Keys werden verschluesselt** in `\\NandFlash\\DevicesKeysStorage.csv` gespeichert und erst nach KeyVault-Unwrap entschluesselt.
+- **Keine Klartext-Key-Persistenz** fuer BidCoS-Knoten. `DefaultKey` ist `[XmlIgnore]` und wird nicht serialisiert.
+- **Wsd2LocalKey ist pro Hub zufaellig**, kein DeviceKey.
+- **Validierung ist minimal** (nur Base64-Check im CSV-Pfad).
+
+BidCoS Device-Typen im v1 Code (aus `BIDCOSSysinfoFrame`):
+
+| Device-Typ | Sysinfo-Type-Code | Adapter | Key-Nutzung |
+| --- | --- | --- | --- |
+| Eq3BasicSmokeDetector (WSD1) | `0x42` (66) | `WsdAdapter` | Keine DeviceKey-Abfrage; Default-Key Logik wird umgangen |
+| Eq3EncryptedSmokeDetector (WSD2) | `0xAA` (170) | `Wsd2Adapter` | DeviceKey fuer Inclusion, danach Wechsel auf lokalen Key |
+| Eq3EncryptedSiren | `0xF9` (249) | `SirAdapter` | DeviceKey fuer Inclusion, danach Wechsel auf lokalen Key |
+
+```csharp
+// BIDCOSSysinfoFrame: DeviceType Mapping aus Sysinfo
+switch (m_deviceTypeNumber[1])
+{
+    case 66:
+        deviceType = BIDCOSDeviceType.Eq3BasicSmokeDetector;
+        itemReference = 91419;
+        break;
+    case 170:
+        deviceType = BIDCOSDeviceType.Eq3EncryptedSmokeDetector;
+        itemReference = 91419;
+        break;
+    case 249:
+        deviceType = BIDCOSDeviceType.Eq3EncryptedSiren;
+        itemReference = 97510;
+        break;
+    default:
+        deviceType = BIDCOSDeviceType.Unknown;
+        break;
+}
+```
+
+Codefragmente (dekompiliert):
+
+```csharp
+// DeviceKeyRepository: DeviceKey entschluesseln
+byte[] key = DecryptDeviceKey(Convert.FromBase64String(array[2]));
+storedDevice.Sgtin = Convert.FromBase64String(array[0]);
+storedDevice.SerialNumber = array[1];
+storedDevice.Key = key;
+```
+
+```csharp
+// BidCoS WSD2: DeviceKey holen und setzen
+bidCosHandler.bidcosKeyRetriever.GetDeviceKey(
+    SGTIN96.Create(base.Node.Sgtin),
+    key => { base.Node.DefaultKey = key; },
+    null, 5000
+);
+```
+
+```csharp
+// BIDCOSNode: Keys werden nicht persistiert
+[XmlIgnore]
+public byte[] DefaultKey { get; set; }
+```
+
+```csharp
+// BIDCOSNodeCollection: lokaler WSD2-Key ist zufaellig
+Wsd2LocalKey = new byte[16];
+new Random().NextBytes(Wsd2LocalKey);
+```
+
+Praktische Folgen:
+- Ohne den KeyVault-Private-Key kann das verschluesselte CSV nicht entschluesselt werden.
+- Es gibt **keine Serial/SGTIN -> DeviceKey Ableitung** im v1 Code.
+- Keine Default-User/Passwoerter fuer BidCoS Keys im Code; Keys kommen aus CSV oder Backend.
+- **WSD1 braucht keinen DeviceKey**. Ein fehlender CSV-Eintrag verhindert die Inclusion nicht.
+
+Default-Credentials oder Keys:
+- **Keine Default-User/Passwoerter** fuer BidCoS Geraete im Code.
+- **Kein statischer DeviceKey** ist eingebettet; Keys kommen aus CSV oder Backend.
+
+### Backend Key-Exchange (DeviceKey Abruf)
+Wenn lokal kein Key vorhanden ist, ruft die SHC den Key vom Backend anhand der SGTIN ab:
+
+```csharp
+// KeyExchangeServiceClient: GetDeviceKey Ablauf
+public KeyExchangeResult GetDeviceKey(byte[] sgtin, out byte[] deviceKey)
+{
+    GetDeviceKeyRequest request = new GetDeviceKeyRequest(sgtin);
+    GetDeviceKeyResponse deviceKey2 = GetDeviceKey(request);
+    deviceKey = deviceKey2.deviceKey;
+    return deviceKey2.GetDeviceKeyResult;
+}
+```
+
+Das bedeutet: Das **Backend ist die autoritative Quelle** fuer DeviceKeys, wenn das lokale CSV sie nicht enthaelt.
+
+### WSD1 (Basic Smoke Detector)
+WSD1 nutzt den normalen BidCoS-Pfad ohne DeviceKey-Retrieval:
+
+```csharp
+public override bool EnsureCurrentNodeDefaultKey()
+{
+    return true;
+}
+```
+
+Die Inclusion laeuft ueber ConfigBegin/ConfigData/ConfigEnd und Group-Registration. Keine Key-Anfrage aus CSV.
+
+### WSD2 (Encrypted Smoke Detector)
+WSD2 holt den DeviceKey und schaltet danach auf den lokalen Hub-Key:
+
+```csharp
+public override bool EnsureCurrentNodeDefaultKey()
+{
+    bidCosHandler.bidcosKeyRetriever.GetDeviceKey(
+        SGTIN96.Create(base.Node.Sgtin),
+        key => { base.Node.DefaultKey = key; },
+        null, 5000
+    );
+    return base.Node.DefaultKey != null;
+}
+```
+
+```csharp
+public byte[] CurrentKey()
+{
+    if (base.Included)
+    {
+        return base.Node.UseDefaultKey ? base.Node.DefaultKey : Wsd2LocalKey;
+    }
+    return base.Node.DefaultKey;
+}
+```
+
+Waehrend der Inclusion wird der **DeviceKey** genutzt, danach setzt `ConfigureNodeKey` den **lokalen Key** und `UseDefaultKey` wird `false`.
+
+### Sirene (Encrypted Siren)
+Die Siren-Logik entspricht WSD2, aber der lokale Key ist der "private" Hub-Key:
+
+```csharp
+public override bool EnsureCurrentNodeDefaultKey()
+{
+    bidCosHandler.bidcosKeyRetriever.GetDeviceKey(SGTIN96.Create(base.Node.Sgtin), UpdateDefaultKey, null, 5000);
+    return base.Node.DefaultKey != null;
+}
+```
+
+```csharp
+public byte[] CurrentKey()
+{
+    if (!base.Included || base.Node.UseDefaultKey)
+    {
+        return base.Node.DefaultKey;
+    }
+    return GetPrivateRandomKey();
+}
+
+private byte[] GetPrivateRandomKey()
+{
+    return bidCosHandler.NodesManager.Wsd2LocalKey;
+}
+```
+
+Die Sirene nutzt den **DeviceKey** fuer Inclusion und wechselt danach auf den **lokalen Key** fuer laufenden Traffic.
 
 ---
 
@@ -233,6 +427,77 @@ Certificate:
         dd:62:0d:5e
 ```
 
+Zusätzlich haben wir das eingebettete Log-Encryption Zertifikat (`SHCLogFileEncryptionCertificate`) extrahiert und mit OpenSSL geprueft:
+
+```text
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            1c:d5:8c:45:00:00:00:00:00:11
+        Signature Algorithm: sha1WithRSAEncryption
+        Issuer: DC = local, DC = rwe, DC = shmprod, CN = SHMPROD-CA-S
+        Validity
+            Not Before: Oct  6 08:33:32 2010 GMT
+            Not After : Oct  6 08:43:32 2040 GMT
+        Subject: CN = SHCLogFileEncryptionCertificate
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:f5:0a:fb:0d:bb:a3:07:01:b0:1c:18:dd:f1:bb:
+                    4f:4b:8e:22:83:c2:c6:3a:d9:cf:a6:9d:6c:ed:d3:
+                    ab:81:09:87:d7:62:ef:08:f8:ac:f1:a3:d6:b8:28:
+                    ad:cd:8b:d3:f3:fe:70:af:aa:0a:20:3a:78:d6:47:
+                    3e:ff:7a:d9:5c:2b:c6:a3:4f:2a:e8:ee:a6:64:74:
+                    c7:7e:93:88:aa:b0:66:47:b1:96:0f:04:b9:29:c3:
+                    73:e8:49:b4:84:98:52:de:ab:5c:12:22:02:b6:a9:
+                    69:97:1e:96:ca:00:24:b9:01:24:7f:53:21:5a:13:
+                    67:b2:2d:82:ff:63:b3:b4:22:23:15:70:b3:39:db:
+                    a2:c6:81:d3:c8:8c:f3:6c:f1:ef:96:8a:18:08:61:
+                    21:25:6f:dd:b3:39:2e:25:75:e7:fe:fc:bb:80:8e:
+                    7f:94:5b:74:7d:d5:da:e7:ea:2b:a8:b8:84:44:d3:
+                    05:a1:64:dd:7d:05:c8:6f:0a:49:9a:9e:f9:d0:5b:
+                    f3:66:57:66:9b:eb:a7:66:26:5b:75:b6:a4:95:fd:
+                    f1:f3:fa:4a:b9:9d:0e:88:fb:87:0b:11:24:63:06:
+                    29:49:55:9d:d5:0a:7b:3e:00:18:d9:9c:62:03:c4:
+                    6f:66:10:4b:ad:4c:b4:e6:19:31:76:65:f5:a3:e8:
+                    97:43
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Digital Signature, Non Repudiation, Key Encipherment, Data Encipherment
+            S/MIME Capabilities: 
+                050...*.H..
+......0...*.H..
+......0...+....0
+..*.H..
+..
+            X509v3 Subject Key Identifier: 
+                24:11:6E:90:1C:2E:12:5F:17:B0:BA:00:B3:74:C9:C9:01:72:CE:C4
+            X509v3 Authority Key Identifier: 
+                70:F0:EC:F6:4F:D2:30:C9:04:2D:B5:B6:00:6F:D2:27:23:45:4C:61
+            X509v3 Basic Constraints: critical
+                CA:FALSE
+    Signature Algorithm: sha1WithRSAEncryption
+    Signature Value:
+        49:3e:92:49:87:0d:0f:27:98:c9:6a:65:f8:b7:7d:b9:67:cc:
+        ba:0b:72:fe:00:65:cb:38:d7:dd:75:80:17:55:c6:57:f4:9d:
+        09:02:21:8b:ae:95:d9:55:0c:cf:64:12:e9:6d:cc:64:a4:36:
+        74:41:a4:9d:78:f7:a4:32:10:a6:ba:16:04:8e:24:94:c2:b0:
+        ef:38:6e:46:82:ef:15:c8:9f:a1:6c:4d:08:b8:bc:b6:41:cb:
+        d0:3d:e9:2d:e9:80:3b:98:89:ba:96:7f:66:c3:9c:bd:d0:ea:
+        5b:dd:af:02:6a:ba:07:5b:fc:ea:a5:c8:26:e0:36:da:48:be:
+        65:5a:95:d5:d8:bf:7b:3b:f1:7a:06:68:88:60:f0:1d:bc:98:
+        29:55:dc:25:7c:1f:e1:b3:64:8c:a3:48:48:d4:3f:0a:89:a7:
+        ff:19:2b:5c:fa:f6:b2:27:d6:8b:db:d0:56:4a:6a:20:8a:84:
+        f6:ab:c1:72:a1:d2:dd:08:38:30:49:d5:8b:73:56:b4:01:33:
+        ce:38:53:84:82:03:17:a4:ec:54:aa:dc:d4:2d:f8:92:a3:8b:
+        13:75:44:46:ce:c4:f6:40:bf:b5:76:fd:20:cb:14:c1:21:0c:
+        a9:0e:c7:32:d6:ef:31:bd:63:94:8f:dc:43:b2:18:e3:4c:53:
+        2a:bc:54:7e
+```
+
 ---
 
 ## Zertifikats-Carving (Dump-Scan)
@@ -243,7 +508,7 @@ Wir haben den NAND-Dump direkt auf PEM-Blocks und DER-encodierte X.509 Sequenzen
 - **PFX/PKCS12**: keine gueltigen PKCS12 Container gefunden.
 - **Private Keys**: ein einzelner DER-codierter RSA Private Key wurde gefunden (1024-bit). Er matcht **keinen** der gecarvten Zertifikats-Moduli und ist kein PKCS12 Bundle. Vermutlich ein Standalone/Test-Key oder fremdes Artefakt. Offset im Dump: `0xC544BCB`.
 - **PKCS#8 (verschluesselt)**: vier PKCS#8 encrypted Key-Blobs gecarvt. Alle zeigen OID `1.2.840.113549.1.12.1.3` (pbeWithSHAAnd3-KeyTripleDES-CBC). Ohne Passphrase sind Inhalte nicht auslesbar; moeglich sind False-Positives oder fremde/irrelevante Blobs.
-- **Cert-Backup-Pfade**: keine `CertBackupLocal` / `CertBackupUser` Strings oder Dateien im Rohdump gefunden; nur als Strings in `shc_api.dll`.
+- **Cert-Backup-Pfade**: UTF-16LE-Strings fuer `\NandFlash\CertBackupLocal` / `\NandFlash\CertBackupUser` tauchen in OS-Message-Strings auf, aber es wurden keine Backup-Dateien oder PFX-Blobs im Rohdump gefunden.
 - **P7B Bundles**: `shc_root_certs.p7b`, `shc_ca_certs.p7b`, `shc_codesign_certs.p7b` und `sysroots.p7b` zu PEM extrahiert. Keine Private-Key-Marker gefunden. Beispiel-Subjects: `RWE_SmartHome_SHC_Codesigning`, `SHMPROD-CA-S`, `SHMPROD-CA-E`.
 - **PKCS#8 Passphrases**: kleine Liste an Standard-Passwoertern getestet (leer, `password`, `123456`, `shc`, `smarthome`, `livisi`, `rwe`, `innogy`, `osboxes.org` usw.), keiner entsperrte die PKCS#8 Blobs.
 - **Naechster Schritt (offline)**: groessere Wordlist mit Hashcat/John gegen die PKCS#8 Blobs laufen lassen; benoetigt PBE-Hash-Extraktion und eine saubere Wordlist.
@@ -357,6 +622,15 @@ Wir haben `boot.hv`, `default.hv` und `user.hv` mit `hvtool` in `.reg` konvertie
 - TPM CSP ist registriert als `SHC Trusted Platform Module Cryptographic Service Provider`.
 
 Keine `CertBackupLocal` / `CertBackupUser` Keys und keine Private-Key-Container-Referenzen in den Hives. Das spricht dafuer, dass Private Keys nicht als exportierbare Blobs im NAND liegen.
+
+## CE-Zertifikatsspeicher-Carving (Raw NAND)
+Wir haben den Raw-NAND gezielt auf Cert-Store-Artefakte und ASN.1-Blobs untersucht:
+
+- UTF-16LE-Treffer fuer `\NandFlash\CertBackupUser` / `\NandFlash\CertBackupLocal` stammen nur aus OS-Log/Diagnose-Strings (Backup/Restore Meldungen). Es wurden keine echten Backup-Dateien oder PFX-Blobs gefunden.
+- 421 ASN.1-DER Kandidaten extrahiert; 48 davon sind gueltige X.509 Zertifikate. Die geparste Liste liegt in `analysis/certs_from_dump/parsed_certs.txt`.
+- Ein PKCS#1 RSA Private Key gefunden bei Offset `0x0C544BCB` (607 Byte, 1024-bit). OpenSSL parst ihn als Private Key, aber sein Modulus passt zu **keinem** der extrahierten Zertifikate. In der Umgebung tauchen Strings zu `support@rebex.net` auf, was eher auf einen Test/Sample-Key hindeutet als auf einen Device-Identity-Key.
+- `support@rebex.net` ist eine Rebex Kontaktadresse (Rebex bietet .NET Networking/Security Libraries). Das staerkt die Einordnung als Test/Sample-Artefakt und nicht als device-spezifischer Schluessel.
+- Keine PEM-Bloecke und keine PKCS#12 Container im Raw-Dump gefunden.
 
 ---
 
@@ -687,6 +961,24 @@ WriteLogfile();                 // Info + Content
 WriteSignature();               // RSA Signatur des Hashes
 ```
 
+Ressourcen-Pfad (konkreter Code):
+
+```csharp
+// LogExporter.GetEncryptionCertificate
+encryptionCertificate =
+    Certificate.CreateFromPemFile(Resources.SHCLogFileEncryptionCertificate);
+
+// LogExporter.WriteEncryptionKey
+RSACryptoServiceProvider rsa = (RSACryptoServiceProvider)encryptionCertificate.PublicKey;
+byte[] keyiv = new byte[aes128.Key.Length + aes128.IV.Length];
+Array.Copy(aes128.Key, keyiv, aes128.Key.Length);
+Array.Copy(aes128.IV, 0, keyiv, aes128.Key.Length, aes128.IV.Length);
+byte[] wrapped = rsa.Encrypt(keyiv, fOAEP: false);
+WriteBinHex(wrapped); // wird in <EncryptionKey> abgelegt
+```
+
+Wir haben das eingebettete Zertifikat nach `extracted_resources/SHCLogFileEncryptionCertificate.pem` exportiert (1364 Bytes).
+
 Wenn ein Encryption-Cert vorhanden ist, wird der Log-Content AES-128 verschluesselt und AES Key + IV werden per RSA in der XML verpackt. Die Signatur nutzt das Geraetezertifikat (personal oder default). Das ist konzeptionell sehr aehnlich zur KeyVault-Struktur.\n
 
 ---
@@ -695,6 +987,10 @@ Wenn ein Encryption-Cert vorhanden ist, wird der Log-Content AES-128 verschluess
 Der Log-Export versucht immer, das Encryption-Zertifikat aus den eingebetteten Ressourcen zu laden (`SHCLogFileEncryptionCertificate`). Ist es vorhanden, wird der Log-Content AES-128 verschluesselt und signiert. Fehlt es, faellt der Export auf Klartext-Content zurueck und signiert trotzdem den Hash. Da das Zertifikat in den Ressourcen kompiliert ist, ist Verschluesselung im Standard-Build die Regel.\n
 
 Das bedeutet auch: Das Log-Encryption-Zertifikat liegt **nicht** als Datei im NAND, sondern ist in der Assembly eingebettet. Der private Schluessel zum Entschluesseln der Logs liegt nicht im SHC, sondern bei der Stelle, die dieses Zertifikat verwaltet.\n
+
+**Entschluesselbarkeit (mit aktuellem Material)**
+
+Der AES Key+IV werden per RSA mit dem **Public Key** des Log-Encryption-Zertifikats gewrappt. Fuer die Entschluesselung braucht man den **Private Key** von `SHCLogFileEncryptionCertificate`. Dieser Private Key ist im NAND Dump oder den Ressourcen nicht vorhanden. Mit den aktuellen Artefakten lassen sich die Log-Exports nur strukturell pruefen, aber nicht entschluesseln.
 
 ---
 
@@ -794,6 +1090,7 @@ Signatur / Integritaet (aus dem dekompilierten Code):
 
 - `settings.config` enthaelt eine `<Signature>` in Hex. `ConfigSignature` berechnet SHA1 ueber `<Sections>` und verifiziert gegen **beliebige** Zertifikate im `CodeSign` Store. Die hart kodierte Thumbprint-Konstante wird nicht genutzt.\n
 - **Keine Call-Sites** fuer `ConfigSignature` im dekompilierten Managed Code; `ConfigurationManager` laedt `settings.config` ohne Signaturpruefung.\n
+- `SettingsFileHelper.ShouldRegisterBackendRequests()` liest `settings.config` direkt und faellt bei Fehlern auf ein hart kodiertes Cutoff-Datum zurueck; eine Signaturpruefung findet dort nicht statt.\n
 - `boot.config` wird direkt von `ModuleLoader` geladen; **keine** Signatur- oder Hash-Pruefung im Managed Code.
 
 Verschluesselung:
@@ -967,6 +1264,278 @@ Der Managed Stack nutzt Standard-.NET CF APIs und Vendor-Libs:
 
 ---
 
+## Backend/API-Endpunkte und Payloads (v1)
+Der Backend-Stack nutzt **WCF SOAP** Clients (generiert via `NetCFSvcUtil`) und ist **kein** REST/JSON API. Jeder Client hat eine Default-`EndpointAddress` auf `https://localhost/Service`, was darauf hindeutet, dass die echten URLs zur Laufzeit aus Konfiguration/Provisionierung stammen. Der einzige hart codierte Host im Code ist der SMS-Service:
+
+- `https://sh70a0100.shmtest.rwe.local/PublicFacingServicesShc/SmsServices/SendSmsService.svc`
+
+In der Praxis referenziert der SHC SOAP Services ueber Action-URIs (Namespaces unter `http://rwe.com/SmartHome/...`). Die folgende Action-Liste stammt direkt aus den dekompilierten Service-Clients.
+
+**Service Action Map (aus den Clients)**
+
+- **KeyExchangeService** (`SmartHome.SHC.BackendCommunication.KeyExchangeScope`)
+  - `.../IKeyExchangeService/EncryptNetworkKey`
+  - `.../IKeyExchangeService/GetDeviceKey`
+  - `.../IKeyExchangeService/GetMasterKey`
+  - `.../IKeyExchangeService/GetDevicesKeys`
+- **ConfigurationService** (`...ConfigurationScope`)
+  - `.../IConfigurationService/GetShcSyncRecord`
+  - `.../IConfigurationService/ConfirmShcSyncRecord`
+  - `.../IConfigurationService/SetManagedSHCConfiguration`
+  - `.../IConfigurationService/AddManagedSHCConfiguration`
+  - `.../IConfigurationService/SetUnmanagedSHCConfiguration`
+  - `.../IConfigurationService/DeleteManagedSHCConfiguration`
+  - `.../IConfigurationService/DeleteUnmanagedSHCConfiguration`
+  - `.../IConfigurationService/GetManagedSHCConfiguration`
+  - `.../IConfigurationService/GetUnmanagedSHCConfiguration`
+  - `.../IConfigurationService/GetRestorePointShcConfiguration`
+- **DeviceManagementService** (`...DeviceManagementScope`)
+  - `.../IDeviceManagementService/UploadLogFile`
+  - `.../IDeviceManagementService/UploadSystemInfo`
+- **SoftwareUpdateService** (`...SoftwareUpdateScope`)
+  - `.../ISoftwareUpdateService/CheckForSoftwareUpdate`
+  - `.../ISoftwareUpdateService/ShcSoftwareUpdated`
+- **DeviceUpdateService** (`...DeviceUpdateScope`)
+  - `.../IDeviceUpdateService/CheckForDeviceUpdate`
+- **ShcInitializationService** (`...ShcIntializationScope`)
+  - `.../IShcInitializationService/SubmitCertificateRequest`
+  - `.../IShcInitializationService/RetrieveInitializationData`
+  - `.../IShcInitializationService/ConfirmShcOwnership`
+  - `.../IShcInitializationService/ShcResetByOwner`
+  - `.../IShcInitializationService/SubmitOwnershipRequest`
+  - `.../IShcInitializationService/RetrieveOwnershipData`
+- **ShcMessagingService** (`...ShcMessagingScope`)
+  - `.../IShcMessagingService/SendSmokeDetectionNotification`
+  - `.../IShcMessagingService/SendSmokeDetectionNotification14`
+  - `.../IShcMessagingService/SendNotificationEmail`
+  - `.../IShcMessagingService/SendEmail`
+  - `.../IShcMessagingService/SendSystemEmail`
+  - `.../IShcMessagingService/GetEmailRemainingQuota`
+- **NotificationService** (`...NotificationScope`)
+  - `.../INotificationService/SendNotifications`
+  - `.../INotificationService/SendSystemNotifications`
+- **PublicStorage / DataTracking** (`...PublicStorageScope`)
+  - `.../IDataTrackingService/StoreData`
+  - `.../IDataTrackingService/StoreListData`
+- **PublicStorage / DAL** (`...PublicStorageScope`)
+  - `.../IDalStorageService/StoreDeviceActivityLog`
+  - `.../IDalStorageService/PurgeDeviceActivityLog`
+- **SmsService** (`...SmsScope`)
+  - `.../ISmsService/SendSystemSms`
+  - `.../ISmsService/SendSms`
+  - `.../ISmsService/GetSmsRemainingQuota`
+- **ApplicationTokenService** (`...ApplicationTokenScope`)
+  - `.../IApplicationTokenService/GetApplicationToken`
+  - `.../IApplicationTokenService/GetApplicationTokenHash`
+
+**Konfigurierte Endpunkte (aus dem USB Update SHC Classic Config)**
+
+Das Update-Paket enthaelt `USB Update SHC Classic\\shc\\settings.config` mit konkreten Service-URLs fuer den Runtime-Betrieb. Diese Werte ersetzen offenbar die `https://localhost/Service` Defaults der generierten Clients.
+
+- `DeviceManagementServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/DeviceManagementService.svc`
+- `ConfigurationServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ConfigurationService.svc`
+- `SoftwareUpdateServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/SoftwareUpdateService.svc`
+- `KeyExchangeServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/KeyExchangeService.svc`
+- `ShcInitializationServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ShcInitializationService.svc`
+- `ShcMessagingServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ShcMessagingService.svc`
+- `ApplicationTokenServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ApplicationManagement/ApplicationTokenService.svc`
+- `DeviceUpdateServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/DeviceUpdateService.svc`
+- `NotificationServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/Notifications/NotificationService.svc`
+- `DataTrackingClientUrl` -> `https://storage.services-smarthome.de/PublicStorageServices/DataTrackingService.svc`
+- `SmsServiceUrl` -> `https://shcc.services-smarthome.de/PublicFacingServicesSHC/SmsServices/SendSmsService.svc`
+- `RelayServerUrl` -> `wss://gateway.services-smarthome.de/API/1.0/shcconnection/connect`
+
+Weitere backend-relevante Settings in der gleichen Datei:
+
+- `CertificateUpnSuffix` -> `shmprod.rwe.local` (UPN-Suffix fuer Zertifikats-Enrollment)
+- `StopBackendRequestsDate` -> `3/1/2024` (Stopp-Datum fuer Backend-Requests)
+- `WebServiceHost` hat `ClientId` und `ClientSecret` auf `clientId` / `clientPass` (wahrscheinlich Platzhalter)
+
+Der gleiche Endpoint-Block wurde auch aus dem NAND Dump via `settings.config` Fragment-Carving rekonstruiert, die URLs sind also on-device vorhanden und nicht nur im USB Update Paket.
+
+`USB Update SHC Classic\\shc\\boot.config` enthaelt keine URLs; es definiert nur die Modul-Startreihenfolge und Log-Level.
+
+**Endpoint-Matrix (URL -> Service-Rolle / Action-Familie)**
+
+| URL (settings.config) | Service-Rolle | Action-Familie |
+| --- | --- | --- |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/DeviceManagementService.svc` | DeviceManagementService | UploadLogFile, UploadSystemInfo |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ConfigurationService.svc` | ConfigurationService | Get/Set/Delete Managed/Unmanaged config, sync record |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/SoftwareUpdateService.svc` | SoftwareUpdateService | CheckForSoftwareUpdate, ShcSoftwareUpdated |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/KeyExchangeService.svc` | KeyExchangeService | GetDeviceKey, GetMasterKey, GetDevicesKeys, EncryptNetworkKey |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ShcInitializationService.svc` | ShcInitializationService | SubmitCertificateRequest, RetrieveInitializationData, Ownership-Flows |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ShcMessagingService.svc` | ShcMessagingService | Send email notifications, quotas |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/ApplicationManagement/ApplicationTokenService.svc` | ApplicationTokenService | GetApplicationToken, GetApplicationTokenHash |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/DeviceUpdateService.svc` | DeviceUpdateService | CheckForDeviceUpdate |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/Notifications/NotificationService.svc` | NotificationService | SendNotifications, SendSystemNotifications |
+| `https://storage.services-smarthome.de/PublicStorageServices/DataTrackingService.svc` | DataTrackingService | StoreData, StoreListData |
+| `https://shcc.services-smarthome.de/PublicFacingServicesSHC/SmsServices/SendSmsService.svc` | SmsService | SendSms, SendSystemSms, GetSmsRemainingQuota |
+| `wss://gateway.services-smarthome.de/API/1.0/shcconnection/connect` | RelayServer | WSS Relay Connection Bootstrap |
+
+**Erreichbarkeit/Deaktivierung (nur aus Config ableitbar)**
+
+- `StopBackendRequestsDate` ist auf `3/1/2024` gesetzt, d.h. die Software beendet Backend-Requests nach diesem Datum, selbst wenn URLs konfiguriert sind.
+- Es gibt keine per-Endpoint Disable-Flags in `settings.config`; der einzige explizite globale Cutoff ist `StopBackendRequestsDate`.
+- Damit ist die Reachability nach dem Cutoff "unbekannt/ueberwiegend deaktiviert"; die Config selbst beweist keine Live-Verfuegbarkeit.
+
+**Security-Hinweis (DNS Spoofing und TLS)**
+
+Dieser Bericht bewertet oder empfiehlt keine Interception-Techniken. Im managed Code sehen wir keinen expliziten "accept all certificates" oder TLS-Bypass. Der Stack setzt auf WCF + TLS-Library und den Zertifikatsspeicher des Geraets, daher ist Standard-Zertifikatsvalidierung zu erwarten, sofern sie nicht in nativen Komponenten umgangen wird.
+
+**Config-Tampering Hinweis**
+
+`settings.config` enthaelt ein `<Signature>` Element. Wenn die Anwendung diese Signatur beim Laden prueft, werden Aenderungen an `StopBackendRequestsDate` oder Service-URLs vermutlich verworfen. Im dekompilierten Managed Layer ist der konkrete Pruefpfad nicht sichtbar; die Enforcement-Stelle bleibt aus dieser Schicht heraus unklar.
+
+---
+
+## DNS-Status der Backend-Domains
+Wir haben die oeffentliche DNS-Aufloesung fuer die in `settings.config` referenzierten Backend-Hostnamen erneut geprueft:
+
+- `services-smarthome.de` und `gateway.services-smarthome.de` liefern **SERVFAIL** von oeffentlichen Resolvern.
+  - `nslookup services-smarthome.de 1.1.1.1` -> "Server failed"
+  - `nslookup services-smarthome.de 8.8.8.8` -> "Server failed"
+  - Gleiches Ergebnis fuer `gateway.services-smarthome.de`
+- Mit SERVFAIL lassen sich keine A/AAAA/MX/TXT/SRV Records aus oeffentlichen Resolvern ziehen.
+- NS/SOA/MX Queries schlagen ebenfalls mit SERVFAIL fehl, d. h. die aktuelle autoritative Kette ist von diesem Host nicht verifizierbar.
+
+Interpretation:
+
+- Die Domain ist registriert und erscheint delegiert (laut frueheren WHOIS-Notizen), aber die oeffentliche DNS-Aufloesung funktioniert aktuell nicht.
+- Moegliche Ursachen sind DNSSEC/Zone-Fehler oder bewusst eingeschraenkte Antworten (Authoritatives verweigern oeffentliche Queries).
+- Ohne autoritative Antworten ist die aktuelle Erreichbarkeit der Services per DNS nicht belegbar.
+
+WHOIS/RDAP Snapshot (DENIC RDAP):
+
+- Status: `active`
+- Last changed: `2020-12-14T10:20:11+01:00`
+
+Gemeldete DNS-Konfiguration (aus frueheren Checks, aktuell nicht verifizierbar):
+
+- Als DNS wurden zuvor Azure Nameserver genannt:
+  - `ns1-02.azure-dns.com`
+  - `ns2-02.azure-dns.net`
+  - `ns3-02.azure-dns.org`
+  - `ns4-02.azure-dns.info`
+- Wegen der aktuellen SERVFAILs konnten diese NS-Werte auf dieser Maschine nicht erneut bestaetigt werden.
+
+**Payload-Strukturen (Beispiele aus den Request/Response Klassen)**
+
+Key Exchange (SGTIN zu DeviceKey):
+
+```csharp
+[XmlRoot("GetDeviceKey", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class GetDeviceKeyRequest
+{
+    [XmlElement(DataType="base64Binary")]
+    public byte[] sgtin;
+}
+
+[XmlRoot("GetDeviceKeyResponse", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class GetDeviceKeyResponse
+{
+    public KeyExchangeResult GetDeviceKeyResult;
+    [XmlElement(DataType="base64Binary")]
+    public byte[] deviceKey;
+}
+```
+
+Zertifikats-Enrollment:
+
+```csharp
+[XmlRoot("SubmitCertificateRequest", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class SubmitCertificateRequestRequest
+{
+    public string shcSerial;
+    public string pin;
+    public string certificateRequest;
+}
+
+[XmlRoot("SubmitCertificateRequestResponse", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class SubmitCertificateRequestResponse
+{
+    public InitializationErrorCode SubmitCertificateRequestResult;
+    public string sessionToken;
+}
+```
+
+Initialization Polling (Cloud -> SHC):
+
+```csharp
+[XmlRoot("RetrieveInitializationDataResponse", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class RetrieveInitializationDataResponse
+{
+    public InitializationErrorCode RetrieveInitializationDataResult;
+    public string issuedCertificate;
+    public ShcSyncRecord shcSyncRecord;
+    public bool furtherPollingRequired;
+    public int pollAfterSeconds;
+}
+
+public class ShcSyncRecord
+{
+    public ShcRole[] Roles;
+    public ShcUser[] Users; // enthaelt PasswordHash in jedem ShcUser
+}
+```
+
+Software-Update Metadaten (Cloud -> SHC):
+
+```csharp
+public class UpdateInfo
+{
+    public UpdateCategory Category;
+    public string DownloadLocation;
+    public string DownloadUser;
+    public string DownloadPassword;
+    public UpdateType Type;
+    public DateTime UpdateDeadline;
+    public string Version;
+}
+```
+
+Log Upload (SHC -> Cloud):
+
+```csharp
+[XmlRoot("UploadLogFile", Namespace = "http://rwe.com/SmartHome/2010/11/08/PublicFacingServices")]
+public class UploadLogFileRequest
+{
+    public string shcSerial;
+    [XmlElement(DataType="base64Binary")]
+    public byte[] content;
+    public int currentPackage;
+    public int nextPackage;
+    public string correlationId;
+}
+```
+
+Device Update Lookup (SHC -> Cloud):
+
+```csharp
+public class DeviceDescriptor
+{
+    public string AddInVersion;
+    public string CurrentFirmwareVersion;
+    public string HardwareVersion;
+    public short Manufacturer;
+    public int ProductId;
+}
+
+public class DeviceUpdateInfo
+{
+    public string ImageChecksum;
+    public string ImageUrl;
+    public string ReleaseNotesLocation;
+    public DeviceUpdateType UpdateType;
+    public string VersionNumber;
+}
+```
+
+**WebSocket Kanal**
+
+`WebSocketSecureClient` startet mit einem HTTPS Handshake, liest den `Location:` Header und konvertiert ihn nach `wss://`. Das deutet auf ein Redirect-basiertes WSS-Bootstrap hin, ohne hart codierte WSS-URL im Binary.
+
+---
+
 ## shc_api.dll (native Flash/Registry Bridge)
 Wir konnten eine **vollstaendige native WinCE ARM** `shc_api.dll` aus dem Dump extrahieren. Die beiden gefundenen Kopien sind byte-identisch (SHA-256 gleich), was 
 fuer konsistente ROM-Extraktion spricht.
@@ -1057,6 +1626,179 @@ Die Assemblies enthalten wichtige Ressourcen:\n
 - Defaults und Konfigurationswerte.\n
 
 Darum tauchen einige Zertifikate nicht als separate Dateien im NAND auf.\n
+
+Ressourcen-Dateien (resx) Ueberblick:
+
+- **Core Trust Store Bundle**: `RWE.SmartHome.SHC.Core.Properties.Resources.resx` enthaelt 10 Binary-Blobs (`System.Byte[]`) mit CA/Root-Material, u. a. `DigiCertGlobalRootCA`, `DigiCertGlobalRootG2`, `MicrosoftRSARootCA2017`, `MicrosoftEVECCRootCA2017`, `DTRUSTRootClass3CA22009`, `SHCRootCA_VerisignNew`, `SHCSubCA_VerisignNew`, plus `shc_ca_certs` und `shc_root_certs`.
+- **Log-Encryption Zertifikat**: `RWE.SmartHome.SHC.BusinessLogic.Properties.Resources.resx` enthaelt ein einzelnes Binary-Blob `SHCLogFileEncryptionCertificate` (wird im `LogExporter` genutzt).
+- **Serial Resource**: `RWE.SmartHome.SHC.BusinessLogic.Resources.Resources.resx` enthaelt ein Binary-Blob namens `Serial` (wird im Business-Logic Layer genutzt).
+- **Logging Pattern**: `RWE.SmartHome.SHC.BusinessLogic.Properties.Resource.resx` enthaelt `LogEntryPattern` (String-Pattern fuer Logeintraege).
+- **DataAccess Schema Strings**: `RWE.SmartHome.SHC.DataAccess.Properties.Resources.resx` enthaelt 41 String-Keys, z. B. `LogicalDevicesXml`, `DeviceActivityLogs`, `ApplicationsSettings`.
+- **Auth- und Error-Strings**: mehrere `*.ErrorStrings.resx` und `ErrorResources.resx` enthalten Fehlermeldungen und Labels.
+- **Abhaengigkeiten**: die Microsoft.Practices Mobile ContainerModel Ressourcen enthalten wenige String-Fehlertexte.
+
+In Summe sind die Ressourcen ueberwiegend Strings plus einige Binary-Blobs fuer Trust und Log-Encryption. Das erklaert, warum bestimmte Zertifikate in den Binaries auftauchen, aber nicht als eigene Dateien im NAND.
+
+**Coprocessor Firmware Blob (Serial)**
+
+Die Ressource `Serial` (32.768 Bytes) ist das AVR-Coprocessor-Firmware-Image. Der Updater berechnet eine CRC ueber das Blob und flasht es anschliessend.
+
+```csharp
+// CoprocessorUpdater.CheckCoprocImageIntegrity
+byte[] serial = Resources.Serial;
+foreach (byte val in serial) crc.CRC16_update(val);
+string text = crc.CRC16_High.ToString(\"X2\") + crc.CRC16_Low.ToString(\"X2\");
+if (text != configuration.TargetCoprocessorChecksum)
+    throw new CoprocessorUpdateException(...);
+
+// CoprocessorUpdater.FlashCoprocessor
+using MemoryStream data_to_write = new MemoryStream(Resources.Serial);
+isFlashingSuccessful = AVRFirmwareManager.UpdateAVR(data_to_write);
+```
+
+Wir haben das Blob nach `extracted_resources/Serial.bin` exportiert.
+
+**Serial.bin Detailanalyse (AVR Image)**
+
+Binary Eigenschaften:
+
+- Groesse: 32.768 Bytes (0x8000), typisch fuer AVR Flash Images.
+- Entropie: ~5.45 bits/byte (nicht komprimiert/verschluesselt).
+- Padding: grosser 0xFF Bereich ab 0x51A6 (10.842 Bytes) und 0x00 Tail ab 0x7C00 (1.024 Bytes).
+- Codebereich: nicht-0xFF/0x00 Daten von ca. 0x0100 bis ca. 0x506C.
+
+Vector Table (4-Byte Slots, 26 Eintraege bei 0x0000-0x0067):
+
+```
+v00 @0x0000: JMP 0x4DD4
+v01 @0x0004: JMP 0x0842
+v02 @0x0008: JMP 0x0850
+v03 @0x000C: RETI
+v04 @0x0010: RETI
+v05 @0x0014: RETI
+v06 @0x0018: JMP 0x0B36
+v07 @0x001C: RETI
+v08 @0x0020: RETI
+v09 @0x0024: RETI
+v10 @0x0028: RETI
+v11 @0x002C: RETI
+v12 @0x0030: RETI
+v13 @0x0034: RETI
+v14 @0x0038: JMP 0x0B08
+v15 @0x003C: RETI
+v16 @0x0040: RETI
+v17 @0x0044: RETI
+v18 @0x0048: JMP 0x0CF0
+v19 @0x004C: RETI
+v20 @0x0050: JMP 0x0CE4
+v21 @0x0054: RETI
+v22 @0x0058: RETI
+v23 @0x005C: RETI
+v24 @0x0060: RETI
+v25 @0x0064: RETI
+```
+
+Disassembly Beispiele (avr-objdump, -b binary -m avr):
+
+```
+00000000: 0c 94 ea 26  jmp  0x4dd4
+00000004: 0c 94 21 04  jmp  0x0842
+00000008: 0c 94 28 04  jmp  0x0850
+0000000c: 18 95        reti
+...
+00004dd4: 0f e9        ldi  r16, 0x9F
+00004dd6: 0d bf        out  0x3d, r16
+00004de0: 0e 94 01 28  call 0x5002
+00004df4: 0c 94 e7 26  jmp  0x4dce
+```
+
+Wahrscheinliche MCU Familie:
+
+- 0x8000 Imagegroesse und 26 Vectoren passen gut zu einem AVR ATmega328-Cluster (avr5 Familie). Das ist eine best-fit Annahme basierend auf Vector Count und Flash Groesse; die exakte MCU ist im Dump nicht sicher belegt.
+- I/O Register Usage passt zur ATmega328p UART0 Map (I/O 0x20-0x22 fuer UCSR0A/B/C, 0x24 fuer UBRR0L, 0x26 fuer UDR0) sowie Stackpointer Setup via I/O 0x3D/0x3E (SPL/SPH).
+- Feld-Hinweis: das Board nutzt einen **16 MHz External Crystal**, was zu Low Fuse `0xFF` passt (Full-Swing Oscillator, CKDIV8 deaktiviert).
+
+```asm
+4e04: out 0x21, r20    ; UCSR0B
+4e06: out 0x22, r21    ; UCSR0C
+4e28: out 0x20, r16    ; UCSR0A
+a90:  out 0x24, r17    ; UBRR0L
+a9a:  out 0x26, r16    ; UDR0
+```
+
+Bootloader Hinweise:
+
+- Kein `spm` Instruction im Binary gefunden; das spricht fuer ein App-Image ohne Self-Programming Bootloader.
+- Die SHC v2 Datei `serial_v0.e.bin` ist byte-identisch zu `Serial.bin` (SHA-256 gleich).
+
+**I/O Nutzung und Pin-Hinweise (AVR I/O Space)**
+
+Beobachtete Low-I/O Adressen (aus der Disassembly):
+
+- 0x03/0x04/0x05 (PINB/DDRB/PORTB) mit Bit-Operationen auf PORTB:
+  - `sbi 0x05,2`, `cbi 0x05,2` (PB2)
+  - `cbi 0x05,3` (PB3)
+  - `sbi 0x05,5` (PB5)
+  - `sbic 0x03,4` (PB4 Input)
+- 0x07/0x08 (DDRC/PORTC) wird genutzt, PORTC Lines werden konfiguriert.
+- 0x09/0x0B (PIND/PORTD) wird genutzt, PORTD ist aktiv.
+- 0x20-0x27 genutzt fuer UART0 Register (UCSR0A/B/C, UBRR0L, UDR0).
+- 0x3D/0x3E und 0x3F genutzt (SPL/SPH, SREG).
+
+Wenn die MCU eine ATmega328p ist, entsprechen PB2/PB3/PB4/PB5 der SPI Pin-Gruppe (SS/MOSI/MISO/SCK). Das Pattern aus PB2/PB3/PB5 toggles und PB4 read passt zu SPI-Signalen, die exakte Verdrahtung ist jedoch board-abhaengig.
+
+**Coprocessor Flash-Protokoll (aus dekompiliertem Code)**
+
+Der SHC nutzt **kein** UART Bootloader-Update. Er programmiert den AVR Coprocessor per **SPI ISP** mit klassischen AVR-ISP Commands. Die Firmware wird als raw Binary gestreamt und in 64-Word (128-Byte) Pages geschrieben.
+
+Kernschritte und Commands (aus `AVRFirmwareManager`):
+
+```csharp
+// 1) Programming enable
+// 0xAC 0x53 0x00 0x00
+array[0] = 0xAC; array[1] = 0x53; array[2] = 0x00; array[3] = 0x00;
+
+// 2) Chip erase
+// 0xAC 0x80 0x00 0x00
+array[0] = 0xAC; array[1] = 0x80; array[2] = 0x00; array[3] = 0x00;
+
+// 3) Poll ready
+// 0xF0 0x00 0x00 0x00
+array[0] = 0xF0; array[1] = 0x00; array[2] = 0x00; array[3] = 0x00;
+```
+
+Flash-Loop (raw Binary, 2 Bytes pro Wort):
+
+```csharp
+short addr = 0;
+short pageWords = 64; // 128 bytes
+
+// Load program memory (low/high byte)
+// low:  0x40 0x00 addr data
+// high: 0x48 0x00 addr data
+SendDataByte(data, (byte)(addr & 0x3F), bDataHigh: false);
+SendDataByte(data, (byte)(addr & 0x3F), bDataHigh: true);
+addr++;
+
+// Wenn addr % 64 == 0, Page write:
+// 0x4C high_addr low_addr 0x00
+WritePage((short)(addr - pageWords));
+```
+
+Optionale Fuse/Lock Programmierung (im Code vorhanden, im Update-Flow nicht genutzt):
+
+```csharp
+// 0xAC 0xE0 = lock bits
+// 0xAC 0xA0 = low fuse
+// 0xAC 0xA8 = high fuse
+// 0xAC 0xA4 = extended fuse
+WriteLockFuseBits(LockType.LOCK, lockBits);
+WriteLockFuseBits(LockType.LOW, fuseLow);
+WriteLockFuseBits(LockType.HIGH, fuseHigh);
+WriteLockFuseBits(LockType.EXTENDED, fuseExt);
+```
+
+Fazit: der Coprocessor wird per **SPI ISP** programmiert, kein Serial Bootloader. Das `Serial.bin` ist ein raw AVR Application Image und wird direkt geflasht.
 
 ---
 
