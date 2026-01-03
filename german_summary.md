@@ -12,6 +12,10 @@
 - [Hardware](#hardware)
 - [Software-Stack](#software-stack)
 - [RF-Protokolle und Geraetekommunikation (aus Code)](#rf-protokolle-und-geraetekommunikation-aus-code)
+- [Protokoll-UEbersicht: BidCoS vs CoSIP (aus Code)](#protokoll-uebersicht-bidcos-vs-cosip-aus-code)
+- [Protokollnutzung nach Geraetetyp (aus Code)](#protokollnutzung-nach-geraetetyp-aus-code)
+- [BidCoS vs SIPcos Gegenueberstellung (technisch)](#bidcos-vs-sipcos-gegenueberstellung-technisch)
+- [Autorschaft-Hinweise (Code-Metadaten)](#autorschaft-hinweise-code-metadaten)
 - [BidCoS Key-Verwendung und Validierung (v1)](#bidcos-key-verwendung-und-validierung-v1)
 - [Externer Kontext zu RF-Protokollen und Vendor (oeffentliche Quellen)](#externer-kontext-zu-rf-protokollen-und-vendor-oeffentliche-quellen)
 - [NAND-Akquisition und Integritaet](#nand-akquisition-und-integritaet)
@@ -104,7 +108,228 @@ Board-Pinout Hinweis (Community CSV):
 
 - `RWE_Zentrale_Pinbelegung.csv` listet **ST400** als `PB5 (RXD0)` und `PB4 (TXD0)`; das sind UART0 Pins des Main CPU.
 - Die gleiche Datei listet **SPI0** an **ST101** (`PA0/PA1/PA2/PA3` fuer MISO/MOSI/SPCK/NPCS0).
-- In der CSV stehen **keine** TRX868/CC1101 oder GDO0/GDO2 Hinweise, die exakte Leitung ist damit dort nicht belegt.
+  - In der CSV stehen **keine** TRX868/CC1101 oder GDO0/GDO2 Hinweise, die exakte Leitung ist damit dort nicht belegt.
+  
+---
+
+## Protokoll-UEbersicht: BidCoS vs CoSIP (aus Code)
+Im dekompilierten Code sind **BidCoS** und **CoSIP/SIPcos** klar getrennte RF-Stacks. BidCoS entspricht der HomeMatic-Familie, CoSIP basiert auf dem CORESTACK-Header mit Routing und MAC-Security.
+
+### BidCoS (HomeMatic-Familie)
+Belege und Struktur:
+- Eigener BidCoS-Header mit 9-Byte-Header (Frame Counter, Header Bits, Frame Type, 3-Byte Sender, 3-Byte Receiver).
+- BidCoS wird fuer bestimmte eQ-3 Geraetetypen genutzt (Rauchmelder und Sirene in diesem Code).
+- BidCoS-Nachrichten koennen ueber SIPcos transportiert werden, bleiben aber ein eigenes Frame-Format.
+
+Codefragmente:
+
+```csharp
+// BidCoS-Header Parsing (9 Bytes)
+private byte m_frameCounter;
+private BIDCOSHeaderBitField m_headerBits;
+private BIDCOSFrameType m_frameType;
+private byte[] m_sender;
+private byte[] m_receiver;
+
+public bool Parse(ref List<byte> message)
+{
+    if (message.Count >= 9)
+    {
+        m_frameCounter = message[0];
+        m_headerBits = (BIDCOSHeaderBitField)message[1];
+        m_frameType = (BIDCOSFrameType)message[2];
+        m_sender = new byte[3] { message[3], message[4], message[5] };
+        m_receiver = new byte[3] { message[6], message[7], message[8] };
+        message.RemoveRange(0, 9);
+        return true;
+    }
+    return false;
+}
+```
+
+```csharp
+// BidCoS-Device-Typen im Sysinfo-Frame
+case 66:  deviceType = BIDCOSDeviceType.Eq3BasicSmokeDetector; break;
+case 170: deviceType = BIDCOSDeviceType.Eq3EncryptedSmokeDetector; break;
+case 249: deviceType = BIDCOSDeviceType.Eq3EncryptedSiren; break;
+```
+
+Fundstellen:
+- `SerialAPI/BIDCOSHeader.cs`
+- `SerialAPI/BidCoSFrames/BIDCOSSysinfoFrame.cs`
+- `SerialAPI/BidCosLayer/*`
+
+### CoSIP / SIPcos
+Belege und Struktur:
+- SIPcos nutzt CORESTACK-Header mit Routing, MAC-Security und Frame Types.
+- SIPcos hat danach einen eigenen 2-Byte-Header (Frame Type + Flags + Sequence Number).
+- Frame-Type-Menge umfasst Konfiguration, Status, Routing, Firmware-Update, Schalten und Zeitinformationen.
+
+Codefragmente:
+
+```csharp
+// CORESTACK-Header Parsing (Routing + MAC-Security)
+m_frameType = (CorestackFrameType)((data[0] & 0x1C) >> 2);
+m_macSecurity = (data[0] & 0x20) == 32;
+...
+data.CopyTo(2, m_macDestination, 0, 3);
+data.CopyTo(5, m_macSource, 0, 3);
+...
+if (m_macSecurity)
+{
+    data.CopyTo(8, m_sequence_number, 0, 4);
+    data.CopyTo(12, m_mic, 0, 4);
+}
+```
+
+```csharp
+// SIPcos-Header (2 Bytes nach CORESTACK)
+m_sipcosFrameType = (SIPcosFrameType)(data[0] & 0x3F);
+m_stayAwake = (data[0] & 0x40) == 64;
+m_bidi = (data[0] & 0x80) == 128;
+m_sequenceNumber = data[1];
+```
+
+```csharp
+// SIPcos Frame-Type Map
+public enum SIPcosFrameType : byte
+{
+    NETWORK_MANAGEMENT_FRAME = 0,
+    ROUTE_MANAGEMENT = 1,
+    FIRMWARE_UPDATE = 15,
+    ANSWER = 16,
+    CONFIGURATION = 17,
+    STATUSINFO = 18,
+    TIMESLOT_CC = 19,
+    DIRECT_EXECUTION = 20,
+    TIME_INFORMATION = 21,
+    UNCONDITIONAL_SWITCH_COMMAND = 22,
+    CONDITIONAL_SWITCH_COMMAND = 23,
+    LEVEL_COMMAND = 24,
+    VIRTUAL_BIDCOS_COMMAND = 119
+}
+```
+
+Fundstellen:
+- `SerialAPI/CORESTACKHeader.cs`
+- `SerialAPI/SIPcosHeader.cs`
+- `SerialAPI/SIPcosFrameType.cs`
+- `SipcosCommandHandler/*`
+
+### Protokoll-Auswahl im Device-Info
+SIPcos Device-Info-Frames deklarieren explizit, welches Protokoll ein Device nutzt.
+
+```csharp
+public enum DeviceInfoProtocolType : byte
+{
+    SIPcos,
+    BIDcos
+}
+```
+
+Das wird genutzt, um Inklusion und Security pro Device zu steuern.
+
+---
+
+### HomeMatic AES Challenge-Response Aequivalenz (BidCoS)
+Der HomeMatic AES Challenge-Response Ablauf aus der oeffentlichen Analyse passt hier nahezu 1:1. Der Code bildet einen Session-Key per XOR (6-Byte Challenge, auf 16 Bytes gepadded) mit dem AES-Key und verwendet danach ein zweistufiges AES-Verfahren mit einem XOR gegen den m-Frame-Teil. Das wird fuer BidCoS-Geraete mit Verschluesselung genutzt (z.B. WSD2 und Sirene).
+
+Codefragment:
+
+```csharp
+// Session-Key aus Challenge (auf 16 Bytes gepadded) XOR AES-Key
+sessionKey = XORArray(PadArray(challengeBytes, 16), aesKey);
+
+// AES(payload) = Enc( Enc(random6||m[0..9]) XOR m[10..25] )
+byte[] b = originalMessage.Take(10).ToArray();
+byte[] input = AppendArray(random6Bytes, b);
+byte[] a = Encrypt(input);
+byte[] b2 = originalMessage.Skip(10).Take(16).ToArray();
+byte[] input2 = XORArray(a, b2);
+byte[] array = Encrypt(input2);
+```
+
+Fundstellen:
+- `SerialAPI/AesChallengeResponse.cs`
+- `SerialAPI.BidCosLayer.DevicesSupport.Wsd2/ReceiveFrameHandlerAnswer.cs`
+- `SerialAPI.BidCosLayer.DevicesSupport.Sir/ReceiveFrameHandlerAnswer.cs`
+
+Referenz (extern): https://git.zerfleddert.de/hmcfgusb/AES/
+
+---
+
+## Protokollnutzung nach Geraetetyp (aus Code)
+Basierend auf den Protokoll-Stacks und den Device-Mappings in diesem Repo:
+
+### BidCoS-only Geraete (explizit in BidCoS Sysinfo/Adapter)
+- **Eq3BasicSmokeDetector** (WSD)
+- **Eq3EncryptedSmokeDetector** (WSD2)
+- **Eq3EncryptedSiren** (SIR)
+
+Fundstellen:
+- `SerialAPI/BidCoSFrames/BIDCOSSysinfoFrame.cs`
+- `SerialAPI/BidCosLayer/*`
+
+### CoSIP/SIPcos Geraete (ueber SIPcos-Stacks/Adapter)
+Diese Typen sind im Builtin-Mapping gelistet und werden ueber SIPcos behandelt:
+- `RST`, `RST2` (Radiator Thermostat)
+- `WRT` (Room Thermostat)
+- `FSC8` (Floor Heating Control)
+- `PSS`, `PSSO` (Pluggable Switch)
+- `WSC2` (Wall Controller)
+- `BRC8` (Basic Remote)
+- `WMD`, `WMDO` (Motion Detector)
+- `WDS` (Door/Window Sensor)
+- `PSD` (Pluggable Dimmer)
+- `PSR` (Router)
+- `ISS2`, `ISD2`, `ISC2`, `ISR2` (In-wall Geraete)
+- `RVA`, `ChargingStation`, `PresenceDevice` (weitere gemappte Typen)
+
+Fundstellen:
+- `RWE.SmartHome.SHC.DeviceManagerInterfaces/PhysicalDeviceFactory.cs`
+- `RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE/RWE.SmartHome.Common.ControlNodeSHCContracts.Entities.Configuration.Enums/BuiltinPhysicalDeviceType.cs`
+- `RWE.SmartHome.SHC.SipCosProtocolAdapter/*`
+
+Hinweis: Die Protokollauswahl kommt aus `DeviceInfoProtocolType` (SIPcos vs BIDcos) in Device-Info-Frames.
+
+---
+
+## BidCoS vs SIPcos Gegenueberstellung (technisch)
+Lesbare Gegenueberstellung aus dem Code:
+
+| Aspekt | BidCoS | SIPcos / CoSIP |
+| --- | --- | --- |
+| Header-Layout | 9-Byte BidCoS-Header: Frame Counter, Header Bits, Frame Type, 3-Byte Sender, 3-Byte Empfaenger | CORESTACK-Header (Routing + MAC-Security) + 2-Byte SIPcos-Header (Frame Type + Flags + Sequence Number) |
+| Addressierung | Nur 3-Byte Sender/Empfaenger | MAC + IP Felder, Hop Limit, geroutete Address-Extensions |
+| Routing | Kein Routing im Header | Explizite Routing-Modi: FIRST_ROUTED, IN_PATH, LAST_ROUTED |
+| Security im Header | Keine MAC-Security Felder im BidCoS-Header | MAC-Security Flag + MIC + Sequence Counter im CORESTACK |
+| AES Challenge/Response | Fuer verschluesselte BidCoS-Geraete (WSD2/Sirene) | Nicht im SIPcos Flow genutzt |
+| Frame Types | BidCoS-spezifische Typen (separate Enums) | SIPcos Frame Types: NETWORK_MANAGEMENT, ROUTE_MANAGEMENT, FIRMWARE_UPDATE, STATUSINFO, SWITCH, usw. |
+| Stack-Pfade | `SerialAPI.BidCosLayer/*`, `SerialAPI.BidCoSFrames/*` | `SerialAPI/SIPcos*`, `SipcosCommandHandler/*` |
+
+Namenshinweis: Im Code werden **CoSIP** und **SIPcos/SIPcos** fuer denselben Protokoll-Stack verwendet. High-Level nutzt `ProtocolIdentifier.Cosip`, der Low-Level-Stack heisst `SIPcos*`.
+
+Code-Referenzen:
+- BidCoS Header: `SerialAPI/BIDCOSHeader.cs`
+- CORESTACK Header: `SerialAPI/CORESTACKHeader.cs`
+- SIPcos Header/Types: `SerialAPI/SIPcosHeader.cs`, `SerialAPI/SIPcosFrameType.cs`
+- AES Challenge/Response: `SerialAPI/AesChallengeResponse.cs`
+
+---
+
+## Autorschaft-Hinweise (Code-Metadaten)
+Es gibt keinen expliziten "CoSIP authored by X" Hinweis im Code. Die staerksten Zuordnungen kommen aus Assembly-Metadaten und Namespaces:
+
+- Viele zentrale SHC-Assemblies fuehren `AssemblyCompany("Innogy SE")`, inkl. der SIPcos-Protocol-Adapter Module.
+  - Beispiel: `RWE.SmartHome.SHC.SipCosProtocolAdapter/Properties/AssemblyInfo.cs`
+  - Beispiel: `RWE.SmartHome.SHC.SipCos.TechnicalConfiguration/Properties/AssemblyInfo.cs`
+- Einige Shared-Contracts/SDK Assemblies fuehren `AssemblyCompany("RWE")`.
+  - Beispiel: `RWE.SmartHome.Common.ControlNodeSHCContracts.WinCE/Properties/AssemblyInfo.cs`
+- eQ-3 taucht nur als **Device-Typ-Name** auf, nicht als Protokoll-Autor.
+  - Beispiel: `RWE.SmartHome.SHC.DeviceManagerInterfaces/DeviceTypesEq3.cs`
+  - Beispiel: `SerialAPI/BidCoSFrames/BIDCOSDeviceType.cs`
+
+Aus dem Repo allein sieht CoSIP/SIPcos wie Teil des RWE/Innogy SmartHome-Stacks aus, waehrend eQ-3 nur fuer bestimmte Device-Typen (hauptsaechlich im BidCoS-Pfad) referenziert wird.
 
 AT91 Pin-Mapping (aus der gleichen CSV):
 
