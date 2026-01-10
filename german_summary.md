@@ -20,6 +20,11 @@
 - [Externer Kontext zu RF-Protokollen und Vendor (oeffentliche Quellen)](#externer-kontext-zu-rf-protokollen-und-vendor-oeffentliche-quellen)
 - [NAND-Akquisition und Integritaet](#nand-akquisition-und-integritaet)
 - [ROM/XIP Extraktion](#romxip-extraktion)
+- [nk_signed.bin Rekonstruktion (B000FF)](#nk_signedbin-rekonstruktion-b000ff)
+- [Script: extract_nk_signed.py](#script-extract_nk_signedpy)
+- [Extrahierte Inhalte aus nk_signed.bin (Uebersicht)](#extrahierte-inhalte-aus-nk_signedbin-uebersicht)
+- [Zertifikate aus nk_signed.bin (PKCS7 Kurzbefund)](#zertifikate-aus-nk_signedbin-pkcs7-kurzbefund)
+- [SHCWrapperDll Strings (Auszug)](#shcwrapperdll-strings-auszug)
 - [Persistente Registry (EKIM)](#persistente-registry-ekim)
 - [ROM/XIP Modul-Metadaten](#romxip-modul-metadaten)
 - [KeyVault XML (voller Inhalt)](#keyvault-xml-voller-inhalt)
@@ -38,37 +43,6 @@
 - [SGTIN Erzeugung und Serial-Mapping (Code und Beispiele)](#sgtin-erzeugung-und-serial-mapping-code-und-beispiele)
 - [DeviceKey Lebenszyklus (lesbarer Ablauf)](#devicekey-lebenszyklus-lesbarer-ablauf)
 - [KeyVault zu DeviceKey Kette (lesbarer Ablauf)](#keyvault-zu-devicekey-kette-lesbarer-ablauf)
-- [Log-Export Krypto-Flow (lesbar)](#log-export-krypto-flow-lesbar)
-- [DeviceKey Struktur und Krypto-Pfad (CSV)](#devicekey-struktur-und-krypto-pfad-csv)
-- [DeviceKey CSV Struktur (Felder und Format)](#devicekey-csv-struktur-felder-und-format)
-- [Base64 Ciphertext Analyse (sanitisiert)](#base64-ciphertext-analyse-sanitisiert)
-- [AES Konstruktion (wie der Code arbeitet)](#aes-konstruktion-wie-der-code-arbeitet)
-- [DeviceKey Validierung](#devicekey-validierung)
-- [Log-Export und Verschluesselung (USB)](#log-export-und-verschluesselung-usb)
-- [Log-Verschluesselung (Standardverhalten)](#log-verschluesselung-standardverhalten)
-- [Log-Verschluesselung und MasterKey (Klarstellung)](#log-verschluesselung-und-masterkey-klarstellung)
-- [Log-Decrypt-Key Verfuegbarkeit (Dump-View)](#log-decrypt-key-verfuegbarkeit-dump-view)
-- [Logging-Endpunkte und lokale Speicherung](#logging-endpunkte-und-lokale-speicherung)
-- [settings.config und boot.config (USB-Update + Dump-Korrelation)](#settingsconfig-und-bootconfig-usb-update-dump-korrelation)
-- [DeviceKey Export (USB CSV vorhanden)](#devicekey-export-usb-csv-vorhanden)
-- [Software APIs und interne Services (Ueberblick)](#software-apis-und-interne-services-ueberblick)
-- [Backend/API-Endpunkte und Payloads (v1)](#backendapi-endpunkte-und-payloads-v1)
-- [DNS-Status der Backend-Domains](#dns-status-der-backend-domains)
-- [shc_api.dll (native Flash/Registry Bridge)](#shcapidll-native-flashregistry-bridge)
-- [Interne API-Landkarte (High-Level)](#interne-api-landkarte-high-level)
-- [Interne Klassen (ausgewaehlte Kernbausteine)](#interne-klassen-ausgewaehlte-kernbausteine)
-- [Software-Resources (eingebettete Inhalte)](#software-resources-eingebettete-inhalte)
-- [DnsService.exe (native Bonjour/mDNS Komponente)](#dnsserviceexe-native-bonjourmdns-komponente)
-- [Warum ECB verwendet wurde (und was das bedeutet)](#warum-ecb-verwendet-wurde-und-was-das-bedeutet)
-- [Update Pipeline (software view)](#update-pipeline-software-view)
-- [Standard-Updateverhalten (Community-Dokumentation, Classic SHC v1)](#standard-updateverhalten-community-dokumentation-classic-shc-v1)
-- [Firmware-Validierung (Managed Code)](#firmware-validierung-managed-code)
-- [Application-Update (USB ZIP, Managed Code)](#application-update-usb-zip-managed-code)
-- [Lokaler Betrieb ohne Cloud (technische Zusammenfassung)](#lokaler-betrieb-ohne-cloud-technische-zusammenfassung)
-- [Native Validierung (unbekannter Umfang)](#native-validierung-unbekannter-umfang)
-- [Software-Security Beobachtungen (Managed Layer)](#software-security-beobachtungen-managed-layer)
-- [Wichtige Speicherpfade (beobachtet)](#wichtige-speicherpfade-beobachtet)
-- [Startup Ablauf (High-Level)](#startup-ablauf-high-level)
 
 ## Produktkontext (was es ist, Hersteller, aktueller Status)
 Die SHC v1 (Classic SmartHome Controller) ist die Zentraleinheit der RWE/innogy/LIVISI SmartHome Produktlinie. Es handelt sich um ein Windows Embedded CE 6.0 Geraet, das lokal arbeitet, aber historisch Cloud-Dienste fuer Updates und Remote-Zugriff genutzt hat. Nach dem 1. Maerz 2024 ist der Cloud-Betrieb nicht mehr der primäre Weg; Community-Dokumentation fokussiert deshalb auf lokalen Betrieb und USB-Updates fuer Legacy-Geraete.
@@ -518,6 +492,7 @@ Patentinhaberschaft ist **nicht verifiziert**. Fuer belastbare Aussagen muessen 
 
 ---
 
+
 ## NAND-Akquisition und Integritaet
 Wir analysierten ein einzelnes 256 MB Raw NAND Image. Ein einfacher Check zeigt viele 0xFF Bereiche (normal fuer geloeschten NAND), ist aber keine 100 Prozent Garantie. OOB/ECC Daten fehlen, ein zweiter Dump zum Vergleich existiert nicht.
 
@@ -528,9 +503,146 @@ Ein WinCE ROM/XIP Extract am erwarteten Offset lieferte:
 - `nk.exe` und eine komplette DLL Sammlung
 - `boot.hv`, `default.hv`, `user.hv`
 
+ROM-Header Scan Hinweise:
+- `romhdr_refined.txt` zeigt mehrere ROMHDR Kandidaten nahe `0x006130d0` und `0x00ce11b8`, was auf eine gepackte/XIP Struktur hindeutet statt einer sauberen TOC.
+- `rom_file_presence.txt` meldet, dass zentrale DLLs (z. B. `coredll.dll`, `crypt32.dll`, `fatutil.dll`) **nicht** als zusammenhaengende Bytebereiche vorliegen, was zu XIP-Packing passt.
+
 Die Hives dekodieren sauber und verweisen auf ROM P7B Zertifikats-Bundles. Der TPM CSP ist registriert, Private Key Container tauchen nicht auf.
 
 ---
+
+## nk_signed.bin Rekonstruktion (B000FF)
+Das signierte NK-Image liegt im B000FF-Blockformat vor. Ich habe daraus ein lineares Roh-Image erstellt, indem der Header gelesen und die Blocks an die passenden Speicheradressen geschrieben wurden.
+
+Codefragment (Block-Parsing + Roh-Image Aufbau):
+```python
+def parse_b000ff(data):
+    base = data.find(b"B000FF\n")
+    imgstart = struct.unpack("<I", data[base + 7:base + 11])[0]
+    imglength = struct.unpack("<I", data[base + 11:base + 15])[0]
+    blockstart = struct.unpack("<I", data[base + 15:base + 19])[0]
+    blocklength = struct.unpack("<I", data[base + 19:base + 23])[0]
+    blockchecksum = struct.unpack("<I", data[base + 23:base + 27])[0]
+    pos = base + 27
+    blocks = [(blockstart, blocklength, blockchecksum, pos)]
+    pos += blocklength
+    while pos + 12 <= len(data):
+        addr, length, checksum = struct.unpack("<III", data[pos:pos + 12])
+        pos += 12
+        if addr == 0 and length == 0:
+            break
+        blocks.append((addr, length, checksum, pos))
+        pos += length
+    return imgstart, imglength, blocks
+
+def rebuild_raw(data, imgstart, imglength, blocks):
+    mem = bytearray([0xFF]) * imglength
+    for addr, length, _checksum, data_pos in blocks:
+        offset = addr - imgstart
+        mem[offset:offset + length] = data[data_pos:data_pos + length]
+    return mem
+```
+
+## Script: extract_nk_signed.py
+Reproduzierbares Script:
+- `tools/extract_nk_signed.py`
+
+Beispiele:
+```bash
+python tools/extract_nk_signed.py SHC_Stuff/nk_signed.bin
+python tools/extract_nk_signed.py SHC_Stuff/nk_signed.bin --extract
+```
+
+Outputs:
+- Roh-Image: `SHC_Stuff/nk_raw.bin`
+- Extrahierte Dateien: `SHC_Stuff/nk_raw_extracted`
+
+## Extrahierte Inhalte aus nk_signed.bin (Uebersicht)
+Im ROM liegen WinCE-Komponenten, Treiber, SHC-spezifische DLLs und Zertifikatsbundles.
+
+SHC-spezifische Module:
+- `SHC_Stuff/nk_raw_extracted/shc_api.dll`
+- `SHC_Stuff/nk_raw_extracted/k.shc_api.dll`
+- `SHC_Stuff/nk_raw_extracted/SHCWrapperDll.dll`
+- `SHC_Stuff/nk_raw_extracted/SHC_tpmcsp.dll`
+- `SHC_Stuff/nk_raw_extracted/SHC_SoftwareRTC.dll`
+
+Plattformindikator:
+- `SHC_Stuff/nk_raw_extracted/at91sam9G20ek_*.dll` (AT91SAM9G20 Treiber)
+
+Version:
+- `SHC_Stuff/nk_raw_extracted/OsVersion.txt` -> `1.914`
+
+## Zertifikate aus nk_signed.bin (PKCS7 Kurzbefund)
+Extrahierte PKCS#7-Bundles:
+- `SHC_Stuff/nk_raw_extracted/shc_ca_certs.p7b`
+- `SHC_Stuff/nk_raw_extracted/shc_codesign_certs.p7b`
+- `SHC_Stuff/nk_raw_extracted/shc_root_certs.p7b`
+- `SHC_Stuff/nk_raw_extracted/sysroots.p7b`
+
+Kurzfassung (Subject/Issuer):
+```
+shc_codesign_certs.p7b:
+  Subject: CN=RWE_SmartHome_SHC_Codesigning
+  Issuer:  DC=local, DC=rwe, DC=shmprod, CN=SHMPROD-CA-S
+
+shc_root_certs.p7b:
+  Subject: DC=local, DC=rwe, DC=shmprod, CN=SHMPROD-CA-S (self-signed)
+  Subject: DC=local, DC=rwe, DC=shmprod, CN=SHMPROD-CA-E (self-signed)
+```
+
+Hinweis:
+- `codesigncerts.p7b` ist nur ein Platzhalter-Text.
+- Es sind nur Public-Certs enthalten, keine Private Keys.
+
+## SHCWrapperDll Strings (Auszug)
+`SHCWrapperDll.dll` ist eine .NET CF Assembly mit verwalteten Entry Points fuer System-, Krypto- und Hardware-Funktionen.
+
+String-Auszug:
+```
+GetSGTIN
+ImportCertificate
+ImportPublicKey
+Cert_ImportCertificateWithPrivateKey
+GPIOManager
+SPI
+NTP
+RASManager
+ResetPlatform
+EraseRawPartition
+```
+- [Log-Export Krypto-Flow (lesbar)](#log-export-krypto-flow-lesbar)
+- [DeviceKey Struktur und Krypto-Pfad (CSV)](#devicekey-struktur-und-krypto-pfad-csv)
+- [DeviceKey CSV Struktur (Felder und Format)](#devicekey-csv-struktur-felder-und-format)
+- [Base64 Ciphertext Analyse (sanitisiert)](#base64-ciphertext-analyse-sanitisiert)
+- [AES Konstruktion (wie der Code arbeitet)](#aes-konstruktion-wie-der-code-arbeitet)
+- [DeviceKey Validierung](#devicekey-validierung)
+- [Log-Export und Verschluesselung (USB)](#log-export-und-verschluesselung-usb)
+- [Log-Verschluesselung (Standardverhalten)](#log-verschluesselung-standardverhalten)
+- [Log-Verschluesselung und MasterKey (Klarstellung)](#log-verschluesselung-und-masterkey-klarstellung)
+- [Log-Decrypt-Key Verfuegbarkeit (Dump-View)](#log-decrypt-key-verfuegbarkeit-dump-view)
+- [Logging-Endpunkte und lokale Speicherung](#logging-endpunkte-und-lokale-speicherung)
+- [settings.config und boot.config (USB-Update + Dump-Korrelation)](#settingsconfig-und-bootconfig-usb-update-dump-korrelation)
+- [DeviceKey Export (USB CSV vorhanden)](#devicekey-export-usb-csv-vorhanden)
+- [Software APIs und interne Services (Ueberblick)](#software-apis-und-interne-services-ueberblick)
+- [Backend/API-Endpunkte und Payloads (v1)](#backendapi-endpunkte-und-payloads-v1)
+- [DNS-Status der Backend-Domains](#dns-status-der-backend-domains)
+- [shc_api.dll (native Flash/Registry Bridge)](#shcapidll-native-flashregistry-bridge)
+- [Interne API-Landkarte (High-Level)](#interne-api-landkarte-high-level)
+- [Interne Klassen (ausgewaehlte Kernbausteine)](#interne-klassen-ausgewaehlte-kernbausteine)
+- [Software-Resources (eingebettete Inhalte)](#software-resources-eingebettete-inhalte)
+- [DnsService.exe (native Bonjour/mDNS Komponente)](#dnsserviceexe-native-bonjourmdns-komponente)
+- [Warum ECB verwendet wurde (und was das bedeutet)](#warum-ecb-verwendet-wurde-und-was-das-bedeutet)
+- [Update Pipeline (software view)](#update-pipeline-software-view)
+- [Standard-Updateverhalten (Community-Dokumentation, Classic SHC v1)](#standard-updateverhalten-community-dokumentation-classic-shc-v1)
+- [Firmware-Validierung (Managed Code)](#firmware-validierung-managed-code)
+- [Application-Update (USB ZIP, Managed Code)](#application-update-usb-zip-managed-code)
+- [Lokaler Betrieb ohne Cloud (technische Zusammenfassung)](#lokaler-betrieb-ohne-cloud-technische-zusammenfassung)
+- [Native Validierung (unbekannter Umfang)](#native-validierung-unbekannter-umfang)
+- [Software-Security Beobachtungen (Managed Layer)](#software-security-beobachtungen-managed-layer)
+- [Wichtige Speicherpfade (beobachtet)](#wichtige-speicherpfade-beobachtet)
+- [Startup Ablauf (High-Level)](#startup-ablauf-high-level)
+
 
 ## Persistente Registry (EKIM)
 EKIM Bloecke sind vorhanden, aber nicht als komplette Hives decodierbar. Beobachtungen:
@@ -839,14 +951,22 @@ Usage-Einschaetzung:
 ---
 
 ## Registry-Hives und Cert-Stores (hvtool Dump)
-Wir haben `boot.hv`, `default.hv` und `user.hv` mit `hvtool` in `.reg` konvertiert und nach Cert-Stores/Key-Containern gesucht:
+Wir haben `boot.hv`, `default.hv` und `user.hv` mit `hvtool` in `.reg` konvertiert und die sicherheitsrelevanten Sektionen separat ausgewertet.
 
-- `HKLM\\Comm\\Security\\SystemCertificates\\CodeSign` → `InitFile="\\windows\\shc_codesign_certs.p7b"`
-- `HKLM\\Comm\\Security\\SystemCertificates\\CA` → `InitFile="\\windows\\shc_ca_certs.p7b"`
-- `HKCU\\Comm\\Security\\SystemCertificates\\Root` → `InitFile="\\windows\\shc_root_certs.p7b"`
-- TPM CSP ist registriert als `SHC Trusted Platform Module Cryptographic Service Provider`.
+Kernaussagen:
 
-Keine `CertBackupLocal` / `CertBackupUser` Keys und keine Private-Key-Container-Referenzen in den Hives. Das spricht dafuer, dass Private Keys nicht als exportierbare Blobs im NAND liegen.
+- TLS-Protokolle sind in den SCHANNEL-Settings explizit deaktiviert (`SSL 2.0`, `SSL 3.0` und `Multi-Protocol Unified Hello` jeweils `Enabled=0`, `DisabledByDefault=1`). TLS 1.0/1.2 Schalter sind hier nicht sichtbar.
+- Krypto-Provider umfassen die Standard-Provider aus `rsaenh.dll` plus einen **TPM CSP**: `SHC Trusted Platform Module Cryptographic Service Provider` ? `\Windows\SHC_tpmcsp.dll`.
+- Zertifikatsspeicher werden per InitFile gebunden (System und User):
+  - `HKLM\Comm\Security\SystemCertificates\Root` ? `\windows\sysroots.p7b`
+  - `HKLM\Comm\Security\SystemCertificates\CodeSign` ? `\windows\shc_codesign_certs.p7b`
+  - `HKLM\Comm\Security\SystemCertificates\CA` ? `\windows\shc_ca_certs.p7b`
+  - `HKCU\Comm\Security\SystemCertificates\Root` ? `\windows\shc_root_certs.p7b`
+- `HKLM\Comm\Security\SystemCertificates\Disallowed` enth?lt mehrere Blacklist-Eintr?ge als `blob` (vollst?ndige DER-Zertifikate).
+- Credential Manager ist vorhanden, aber leer (`NumCreds=0`), es gibt keine gespeicherten Nutzer-Creds.
+- `boot.hv` best?tigt den NAND-Treiberstack und das Storage-Layout, enth?lt aber kein Cert/Key-Material.
+
+Keine `CertBackupLocal` / `CertBackupUser` Eintr?ge und keine Private?Key?Container?Referenzen in den Hives ? der Dump enth?lt keine exportierbaren Private Keys.
 
 ## CE-Zertifikatsspeicher-Carving (Raw NAND)
 Wir haben den Raw-NAND gezielt auf Cert-Store-Artefakte und ASN.1-Blobs untersucht:
@@ -2206,3 +2326,62 @@ Die Startup-Sequenz (aus `StartupLogic`) enthaelt:
 - Pflicht-Update-Check (vor der vollen Initialisierung).
 - MasterKey Retrieval und Persistenz (KeyVault Creation beim ersten Lauf).
 - Wiederherstellung von Persistenz und Logs.
+
+
+
+
+## Geraetefirmware-Updates (Ablauf und Code)
+### Trigger und Discovery
+Die SHC prueft per Backend-Aufruf auf Geraetefirmware-Updates; nichts ist hart codiert. Das Backend liefert `DeviceUpdateInfo` mit `ImageUrl`, `ImageChecksum` (MD5/Hex), `VersionNumber` und `UpdateType`:
+```csharp
+var result = serviceClient.CheckForDeviceUpdate(deviceDescriptor.ToServerDeviceDescriptor(), out updateInfo2);
+updateInfo = updateInfo2?.ToShcDeviceUpdateInfo();
+```
+Endpoint-Konfiguration (aus settings): `DeviceUpdateServiceUrl` = `https://shcc.services-smarthome.de/PublicFacingServicesSHC/DeviceUpdateService.svc`, SOAP Action `.../IDeviceUpdateService/CheckForDeviceUpdate` (Namespace 2015/02/09).
+Request/response (WCF) Contracts:
+```csharp
+// Request
+[XmlRoot("CheckForDeviceUpdate", Namespace="http://rwe.com/SmartHome/2015/02/09/PublicFacingServices")]
+public class CheckForDeviceUpdateRequest {
+    [XmlElement(IsNullable=true, Order=0)]
+    public DeviceDescriptor deviceDescriptor;
+}
+
+// Response
+[XmlRoot("CheckForDeviceUpdateResponse", Namespace="http://rwe.com/SmartHome/2015/02/09/PublicFacingServices")]
+public class CheckForDeviceUpdateResponse {
+    public DeviceUpdateResultCode CheckForDeviceUpdateResult;
+    public DeviceUpdateInfo updateInfo;
+}
+
+// DeviceUpdateInfo (Server-Vertrag)
+public class DeviceUpdateInfo {
+    public string ImageChecksum;       // MD5
+    public string ImageUrl;            // Download-URL
+    public string ReleaseNotesLocation;
+    public DeviceUpdateType UpdateType;
+    public string VersionNumber;
+}
+```
+
+### Download und Validierung
+Der Updater laedt von `ImageUrl` in ein temporaeres Verzeichnis und prueft den MD5 vor dem Transfer:
+```csharp
+if (!VerifyMd5(tempFile, updateInfo.ImageChecksum))
+    throw new InvalidDataException("Checksum mismatch");
+```
+Im NAND gibt es keinen Firmware-Cache; Images werden bei Bedarf geladen und danach geloescht (vermutlich `\Temp`/volatiler Speicher, nicht persistentes NAND).
+
+### Transfer zum Geraet (protokollspezifisch)
+Fuer SIPcos/Lemonbeat uebernimmt `CosIPDeviceFirmwareUpdater` die Queue und den Stream des Images:
+```csharp
+updateController.EnqueueFirmwareTransfer(deviceId, firmwareDescriptor);
+// Zustaende: ImageTransferred -> UpdatePending -> UpToDate (oder Fehler/Retry)
+```
+Fehlende Geraete loesen Fehler in `ReincludeHandler` aus; Fehler werden geloggt und ggf. verworfen/neu versucht.
+
+### Persistenz
+- Keine `.bin/.hex/.dfu` Payloads im NAND gefunden.
+- Kein langfristiger Firmware-Cache im Dump sichtbar.
+- Ablauf ist "download ? verify ? push ? delete"; Firmware wird im vorliegenden Flash-Image nicht dauerhaft gespeichert.
+
